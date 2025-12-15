@@ -66,6 +66,35 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = CONFIG.exposure;
 document.body.appendChild(renderer.domElement);
 
+
+// ============================================================================
+// LOADING MANAGER SETUP
+// ============================================================================
+
+const loadingManager = THREE.DefaultLoadingManager;
+
+loadingManager.onLoad = function() {
+    console.log('Loading complete!');
+    const loaderElement = document.getElementById('loader-overlay');
+    
+    // Add the CSS class to fade it out
+    if(loaderElement) {
+        loaderElement.classList.add('fade-out');
+        
+        // Optional: Remove it from DOM entirely after transition ends
+        setTimeout(() => {
+            loaderElement.remove();
+        }, 1000); 
+    }
+};
+
+// Optional: specific progress logs
+loadingManager.onProgress = function(url, itemsLoaded, itemsTotal) {
+    console.log(`Loading file: ${url}.\nLoaded ${itemsLoaded} of ${itemsTotal} files.`);
+};
+// ============================================================================
+
+
 // --- HTML Overlays ---
 
 // Debug overlay
@@ -142,14 +171,14 @@ renderer.domElement.addEventListener('wheel', () => { isAutoMoving = false; }, {
 scene.add(new THREE.AmbientLight(0xffffff, CONFIG.ambientLightIntensity));
 
 // HDR Environment
-const rgbeLoader = new HDRLoader();
+const rgbeLoader = new HDRLoader(loadingManager);
 rgbeLoader.load(`${base}textures/neon_photostudio_4k.hdr`, (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
 });
 
 // Background Sky Sphere
-const textureLoader = new THREE.TextureLoader();
+const textureLoader = new THREE.TextureLoader(loadingManager);
 let skySphere = null;
 
 textureLoader.load(`${base}textures/starts.jpg`, (texture) => {
@@ -173,7 +202,7 @@ textureLoader.load(`${base}textures/starts.jpg`, (texture) => {
 // 4. MODEL LOADING & STAR CREATION
 // ============================================================================
 
-const gltfLoader = new GLTFLoader();
+const gltfLoader = new GLTFLoader(loadingManager);
 const modelPath = `${base}engram1.glb`;
 const CLICKABLE_FACES = [];
 const facesById = {};

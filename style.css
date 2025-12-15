@@ -85,3 +85,50 @@ canvas {
     color: #000000;
     border-color: #00ffcc;
 }
+
+/*
+====================================================
+  3. LOADER OVERLAY
+====================================================
+*/
+#loader-overlay {
+    position: fixed;
+    inset: 0; /* Cover entire screen */
+    background: #000000;
+    z-index: 9999; /* Sit on top of EVERYTHING */
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    transition: opacity 0.8s ease-out, visibility 0.8s ease-out;
+}
+
+/* The container for the GIF and text */
+.loader-content {
+    text-align: center;
+    color: #FFFFFF; /* CHANGED: Text is now white */
+    font-family: 'Arial', sans-serif;
+}
+
+.loading-gif {
+    /* Sizing */
+    width: 30vw; 
+    min-width: 250px; 
+    max-width: 600px;
+    height: auto;
+    margin-bottom: 20px;
+
+    /* BLENDING TRICK: Radial Gradient Mask */
+    /* This fades the edges from opaque (center) to transparent (outside) */
+    -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+    mask-image: radial-gradient(circle, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+    
+    /* Optional: Ensure the image fits nicely */
+    object-fit: cover;
+}
+
+/* Class to hide the loader */
+#loader-overlay.fade-out {
+    opacity: 0;
+    visibility: hidden;
+    pointer-events: none;
+}
