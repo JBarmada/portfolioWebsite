@@ -132,17 +132,18 @@ function makeGlowTexture(size = 256) {
   const r = size / 2;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  grad.addColorStop(0.0, 'rgba(255,255,255,1)');
-  grad.addColorStop(0.12, 'rgba(255,255,255,0.95)');
-  grad.addColorStop(0.35, 'rgba(180,220,255,0.50)');
-  grad.addColorStop(1.0, 'rgba(0,0,0,0)');
+  // --- COLOR CHANGE HERE ---
+  grad.addColorStop(0.0, 'rgba(255,255,255,1)');       // Pure white center
+  grad.addColorStop(0.15, 'rgba(255, 220, 255, 0.9)'); // very bright whitish-purple transition
+    grad.addColorStop(0.5, 'rgba(180, 40, 220, 0.5)');   // The main purple halo color (adjusted for glow)
+    grad.addColorStop(1.0, 'rgba(0,0,0,0)');             // fade to transparent edge
 
-  ctx.fillStyle = grad;
-  ctx.fillRect(0, 0, size, size);
+    ctx.fillStyle = grad;
+    ctx.fillRect(0, 0, size, size);
 
-  const tex = new THREE.CanvasTexture(canvas);
-  tex.colorSpace = THREE.SRGBColorSpace;
-  return tex;
+    const tex = new THREE.CanvasTexture(canvas);
+    tex.colorSpace = THREE.SRGBColorSpace;
+    return tex;
 }
 
 const starSprite = new THREE.Sprite(
