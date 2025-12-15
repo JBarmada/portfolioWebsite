@@ -2,6 +2,8 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { defineConfig } from 'vite';
+
 
 // --- 1. Global Setup ---
 const scene = new THREE.Scene();
@@ -61,7 +63,7 @@ scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
 // A. Load HDR for reflections/lighting ONLY
 const rgbeLoader = new HDRLoader();
-rgbeLoader.load('/textures/neon_photostudio_4k.hdr', (texture) => {
+rgbeLoader.load('./textures/neon_photostudio_4k.hdr', (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
    
@@ -71,7 +73,7 @@ rgbeLoader.load('/textures/neon_photostudio_4k.hdr', (texture) => {
 const textureLoader = new THREE.TextureLoader();
 let skySphere = null;
 
-textureLoader.load('/textures/starts.jpg', (texture) => {
+textureLoader.load('./textures/starts.jpg', (texture) => {
   // Correct color handling for images
   texture.colorSpace = THREE.SRGBColorSpace;
 
@@ -94,7 +96,7 @@ textureLoader.load('/textures/starts.jpg', (texture) => {
 
 // --- 4. Model Loading ---
 const gltfLoader = new GLTFLoader();
-const modelPath = '/engram1.glb';
+const modelPath = './engram1.glb';
 const CLICKABLE_FACES = [];
 
 gltfLoader.load(modelPath, (gltf) => {
