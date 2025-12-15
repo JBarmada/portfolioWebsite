@@ -2,6 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+import { RESUME_DATA } from './resumeData.js';
 
 const base = import.meta.env.BASE_URL;
 
@@ -226,16 +227,29 @@ gltfLoader.load(modelPath, (gltf) => {
 
     faceCount++;
     child.userData.id = faceCount;
-    child.userData.title = child.name || `Experience ${faceCount}`;
-    child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>Description...</p>`;
+    
+    // 1. LOOK UP RESUME DATA 
+    // If we have data for this number, use it. Otherwise default.
+    const resumeEntry = RESUME_DATA[faceCount];
+    
+    if (resumeEntry) {
+      child.userData.title = resumeEntry.title;
+      child.userData.content = resumeEntry.content;
+    } else {
+      child.userData.title = child.name || `Face ${faceCount}`;
+      child.userData.content = `<h3>Locked</h3><p>Data not available.</p>`;
+    }
 
     child.material = child.material.clone();
 
-    // Differentiate Core vs Outer Faces
+    // 2. HANDLE CORE (FACE 13+) - Overrides everything else
     if (child.name.includes('Inside') || child.name.includes('Core')) {
       child.material.emissive.setHex(CONFIG.colorEmissive);
-      child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>You have found the core...</p>`;
+      // Keep the core message mysterious
+      child.userData.title = "The Engram Core";
+      child.userData.content = `<h3>What am I?</h3><p>You have found the source...</p>`;
     } else {
+      // Standard Face Styling
       child.material.map = null;
       child.material.color.setHex(CONFIG.colorBase);
       child.material.emissive.setHex(CONFIG.colorEmissive);
