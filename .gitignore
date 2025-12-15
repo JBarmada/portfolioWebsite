@@ -1,0 +1,18 @@
+# Dependencies
+node_modules/
+
+# Production build outputs (if you run 'npm run build' later)
+dist/
+build/
+
+# System Files
+.DS_Store
+Thumbs.db
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment variables (safety for the future)
+.env

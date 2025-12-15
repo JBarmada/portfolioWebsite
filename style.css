@@ -1,0 +1,87 @@
+/*
+====================================================
+  1. BASE STYLES & CANVAS MANAGEMENT
+====================================================
+*/
+
+/* Remove default margins and padding */
+body {
+    margin: 0;
+    padding: 0;
+    overflow: hidden; /* Prevent scrollbars from appearing */
+    background-color: #000000; /* Default background for a dark scene */
+}
+
+/* Style for the three.js canvas element */
+canvas {
+    /* Make the canvas fixed to the viewport */
+    position: fixed; 
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    
+    /* CRITICAL: Default Z-index is 1. 
+        This allows the canvas to be interactive but is lower than the overlay.
+    */
+    z-index: 1; 
+}
+
+/*
+====================================================
+  2. RESUME CONTENT OVERLAY
+====================================================
+*/
+
+#resume-content {
+    /* Position over the canvas */
+    position: absolute;
+    
+    /* CRITICAL: Must be higher than the default canvas z-index (1) */
+    z-index: 100; 
+    
+    /* Initial state: Hidden */
+    display: none; 
+
+    /* Positioning and Sizing */
+    top: 10vh; /* 10% from the top */
+    right: 10vw; /* 10% from the right */
+    width: min(400px, 80%); /* Max width 400px, but responsive */
+    padding: 25px;
+
+    /* Appearance */
+    background: rgba(10, 20, 30, 0.95); /* Dark, semi-transparent background */
+    color: #FFFFFF;
+    border-radius: 8px;
+    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3); /* Subtle glow effect */
+    font-family: 'Arial', sans-serif;
+    line-height: 1.6;
+}
+
+#resume-content h3 {
+    color: #00ffcc; /* Highlight color for headings */
+    margin-top: 0;
+    border-bottom: 1px solid rgba(0, 255, 204, 0.5);
+    padding-bottom: 10px;
+}
+
+/* Style for the Exit Button (X) */
+#close-content {
+    float: right;
+    background: none;
+    color: #FFFFFF;
+    border: 2px solid #FFFFFF;
+    border-radius: 50%;
+    width: 30px;
+    height: 30px;
+    font-size: 16px;
+    line-height: 1;
+    cursor: pointer;
+    transition: all 0.2s;
+}
+
+#close-content:hover {
+    background: #00ffcc;
+    color: #000000;
+    border-color: #00ffcc;
+}
