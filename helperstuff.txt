@@ -1,0 +1,34 @@
+// --- Lighting Setup 1: Basic Fill ---
+// Use a moderate intensity to lift shadows without washing out colors.
+// const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
+// scene.add(ambientLight);
+
+// --- Lighting Setup 2: Studio Lighting ---
+// Low ambient light for fill
+// scene.add(new THREE.AmbientLight(0xffffff, 0.25)); 
+
+// // Key light (like the sun)
+// const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
+// directionalLight.position.set(5, 10, 5); // Position affects shadow direction
+// directionalLight.castShadow = true; // Enable shadow casting
+// scene.add(directionalLight);
+
+// --- Lighting Setup 3: Dramatic Spotlight ---
+
+// Spot light parameters: (Color, Intensity, Distance, Angle, Penumbra, Decay)
+// const spotLight = new THREE.SpotLight(0x00ffcc, 10, 100, Math.PI * 0.2, 0.5, 2);
+// spotLight.position.set(0, 15, 0); // Position high above the model
+// spotLight.target.position.set(0, 0, 0); // Point the light at the center of the dodecahedron
+// spotLight.castShadow = true; 
+// scene.add(spotLight);
+// scene.add(spotLight.target); // Must add the target object to the scene
+
+// Hemisphere Light: Provides soft, colored ambient light
+// (Sky color, Ground color, Intensity)
+// const hemiLight = new THREE.HemisphereLight(0x4444ff, 0xaa0000, 1.5); 
+// scene.add(hemiLight);
+
+// // Point Light: A subtle blue-white light placed behind and above the model
+// const pointLight = new THREE.PointLight(0xddddff, 5, 50);
+// pointLight.position.set(-10, 5, -10); // Placed to create a rim light effect
+// scene.add(pointLight);

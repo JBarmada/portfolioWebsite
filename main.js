@@ -1,110 +1,54 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
-import { RGBELoader } from 'three/addons/loaders/RGBELoader.js'; // <--- NEW IMPORT
+import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
-// --- Global Setup ---
+// --- 1. Global Setup ---
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, 1000);
 const renderer = new THREE.WebGLRenderer({ antialias: true });
+
 renderer.setSize(window.innerWidth, window.innerHeight);
-// --- NEW TONE MAPPING SETTINGS ---
-renderer.toneMapping = THREE.ACESFilmicToneMapping; // Makes brights look realistic
-renderer.toneMappingExposure = 1.0; 
+renderer.toneMapping = THREE.ACESFilmicToneMapping;
+renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
-// --- Interactivity Globals ---
-const raycaster = new THREE.Raycaster();
-const pointer = new THREE.Vector2();
-const CLICKABLE_FACES = []; // Holds all 12 mesh objects
-let INTERSECTED = null; // Stores the currently hovered face
-// Removed IS_VIEWING_EXPERIENCE flag
 
-// --- New Global Flag to Track Movement ---
-let IS_CONTROLS_MOVING = false;
-
-// --- Controls ---
+// --- 2. Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true; // Provides a smooth, inertial feel
+controls.enableDamping = true;
 controls.dampingFactor = 0.05;
-camera.position.z = 205; // Initial camera distance
+camera.position.z = 255; 
 controls.update();
 
-// --- Controls Event Listeners for Movement Tracking ---
+let IS_CONTROLS_MOVING = false;
+controls.addEventListener('start', () => { IS_CONTROLS_MOVING = true; });
+controls.addEventListener('end', () => { setTimeout(() => { IS_CONTROLS_MOVING = false; }, 100); });
 
-// When the user starts manipulating the controls (mouse down/touch start)
-controls.addEventListener('start', () => {
-    IS_CONTROLS_MOVING = true;
-});
+// --- 3. Lighting & Environment (The "Shiny" Logic) ---
 
-// When the controls stop moving (either immediately on mouse up OR after damping finishes)
-controls.addEventListener('end', () => {
-    // We use a small timeout to ensure the damping has fully settled before allowing a click.
-    setTimeout(() => {
-        IS_CONTROLS_MOVING = false;
-    }, 100); 
-    // Note: The dampingFactor determines how long this takes. 100ms is a safe value.
-});
+scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
-// // --- Lighting ---
-// --- Lighting & Environment (HDRI) ---
+const rgbeLoader = new HDRLoader();
+// FIX: Added leading slash '/' to ensure it looks in root/public
+rgbeLoader.load(
+    '/textures/neon_photostudio_4k.hdr', 
+    function (texture) {
+        texture.mapping = THREE.EquirectangularReflectionMapping;
+        scene.environment = texture;
+        console.log("HDRI loaded successfully.");
+    },
+    undefined,
+    function (error) {
+        console.error("CRITICAL ERROR: HDRI 404. Ensure 'neon_photostudio_1k.hdr' is in 'public/textures/' folder.");
+    }
+);
 
-// 1. Keep a subtle ambient light so shadows aren't pitch black
-scene.add(new THREE.AmbientLight(0xffffff, 0.2)); 
-
-// 2. Load the HDRI
-const rgbeLoader = new RGBELoader();
-
-// REPLACE 'textures/neon_photostudio_1k.hdr' with your actual file path
-rgbeLoader.load('textures/neon_photostudio_1k.hdr', function (texture) {
-    texture.mapping = THREE.EquirectangularReflectionMapping;
-
-    // This applies the image as the "environment" that the shiny object reflects
-    scene.environment = texture;
-
-    // Optional: If you want to see the studio background instead of black, uncomment this:
-    // scene.background = texture; 
-});
-// --- Lighting Setup 1: Basic Fill ---
-// Use a moderate intensity to lift shadows without washing out colors.
-// const ambientLight = new THREE.AmbientLight(0xffffff, 1.5); 
-// scene.add(ambientLight);
-
-// --- Lighting Setup 2: Studio Lighting ---
-// Low ambient light for fill
-// scene.add(new THREE.AmbientLight(0xffffff, 0.25)); 
-
-// // Key light (like the sun)
-// const directionalLight = new THREE.DirectionalLight(0xffffff, 3.0);
-// directionalLight.position.set(5, 10, 5); // Position affects shadow direction
-// directionalLight.castShadow = true; // Enable shadow casting
-// scene.add(directionalLight);
-
-// --- Lighting Setup 3: Dramatic Spotlight ---
-
-// Spot light parameters: (Color, Intensity, Distance, Angle, Penumbra, Decay)
-// const spotLight = new THREE.SpotLight(0x00ffcc, 10, 100, Math.PI * 0.2, 0.5, 2);
-// spotLight.position.set(0, 15, 0); // Position high above the model
-// spotLight.target.position.set(0, 0, 0); // Point the light at the center of the dodecahedron
-// spotLight.castShadow = true; 
-// scene.add(spotLight);
-// scene.add(spotLight.target); // Must add the target object to the scene
-
-// Hemisphere Light: Provides soft, colored ambient light
-// (Sky color, Ground color, Intensity)
-// const hemiLight = new THREE.HemisphereLight(0x4444ff, 0xaa0000, 1.5); 
-// scene.add(hemiLight);
-
-// // Point Light: A subtle blue-white light placed behind and above the model
-// const pointLight = new THREE.PointLight(0xddddff, 5, 50);
-// pointLight.position.set(-10, 5, -10); // Placed to create a rim light effect
-// scene.add(pointLight);
-
-// --- Model Loading Logic ---
+// --- 4. Model Loading ---
 
 const gltfLoader = new GLTFLoader();
-// const modelPath = '/engram_destiny_2.glb'; // Ensure this path is correct
-const modelPath = '/engram1.glb';
-
+const modelPath = '/engram1.glb'; // Ensure this matches your file name exactly
+const CLICKABLE_FACES = [];
+let faceCount = 0;
 
 gltfLoader.load(
     modelPath,
@@ -112,100 +56,112 @@ gltfLoader.load(
         const model = gltf.scene;
         scene.add(model);
 
-        let faceCount = 0;
         model.traverse(function (child) {
             if (child.isMesh) {
-                faceCount++;
-                
-                child.userData.id = faceCount; 
-                child.userData.title = child.name || `Experience ${faceCount}`;
-                
-                // **Placeholder Content:** Replace this with your actual resume data
-                child.userData.content = `<h3>Project Focus: ${child.userData.title}</h3><p>This section details a key skill or project, such as 'Full-Stack Development with React/Node' or '3D Graphics & Game Engine Experience'.</p><p>Key Achievements: [List 3 bullet points]</p>`;
-                
-                child.material = child.material.clone(); 
-                child.userData.originalEmissive = child.material.emissive.getHex();
+                // LOG NAMES: This helps confirm which mesh is which
+                console.log("Loaded mesh:", child.name);
 
+                // --- FILTER LOGIC ---
+                // If the object is named "Inside" (or whatever your core is called), skip adding it to clickable list
+                // You can check the console logs to see the exact name if "Inside" isn't it.
+                if (child.name.includes("Inside") || child.name.includes("Core")) {
+                    // Make the inside glow but NOT be clickable?
+                    child.material = child.material.clone();
+                    child.material.emissiveIntensity = 2.0; // Make core brighter
+                    return; // Skip the rest of the loop for this object
+                }
+
+                faceCount++;
+                        
+                child.userData.id = faceCount;
+                child.userData.title = child.name || `Experience ${faceCount}`;
+                child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>Description...</p>`;
+
+                /// --- MATERIAL OVERRIDE (PURPLE GLASS) ---
+                // --- MATERIAL OVERRIDE (PURPLE & SHINY) ---
+                child.material = child.material.clone();
+
+                // 1. CRITICAL: Remove the green texture so it doesn't override our color
+                child.material.map = null; 
+
+                // 2. Set the Base Color to Purple
+                child.material.color.setHex(0x800080); 
+
+                // 3. Set the Glow (Emissive) to be dark or matching purple
+                // (If we don't change this, it might still glow green!)
+                child.material.emissive.setHex(0x220022); // subtle purple glow
+
+                // 4. Glass/Metal Settings
+                child.material.roughness = 0.1; 
+                child.material.metalness = 0.6; 
+                child.material.transparent = true;
+                child.material.opacity = 0.5; 
+
+                // 5. Save the new purple glow so hover works correctly
+                child.userData.originalEmissive = child.material.emissive.getHex();
+                // Only add the outer panels to the clickable list
                 CLICKABLE_FACES.push(child);
             }
+            
         });
-        
-        if (faceCount !== 12) {
-             console.warn(`Expected 12 faces, but found ${faceCount}.`);
-        } else {
-             console.log("All 12 faces loaded and ready.");
-        }
+
+        console.log(`Model loaded. Found ${faceCount} clickable faces (plus inner core).`);
     },
-    undefined, 
+    undefined,
     function (error) {
         console.error(`Error loading model from ${modelPath}:`, error);
     }
 );
 
-// --- Core Logic for Camera Jump and Content Display ---
+// --- 5. Interaction Logic ---
+
+const raycaster = new THREE.Raycaster();
+const pointer = new THREE.Vector2();
+let INTERSECTED = null;
 
 const faceCenter = new THREE.Vector3();
-
 function handleFaceClick(faceMesh) {
-    // 1. Calculate Target Positions
-    faceMesh.getWorldPosition(faceCenter); 
-    
-    // 2. INSTANTANEOUS PAN/ROTATION 
+    faceMesh.getWorldPosition(faceCenter);
     controls.target.copy(faceCenter);
-    camera.lookAt(faceCenter); 
-    
-    // 3. Force Controls Update
-    controls.update(); 
-    
-    // 4. Display the Content
+    camera.lookAt(faceCenter);
+    controls.update();
     displayResumeContent(faceMesh.userData);
 }
 
-// --- Content Display Functions (unchanged) ---
-
+// UI Logic
 function displayResumeContent(data) {
     let contentDiv = document.getElementById('resume-content');
-    
-    contentDiv.innerHTML = `
-        <button id="close-content">X</button>
-        <h3>${data.title}</h3>
-        ${data.content}
-    `;
-    
-    renderer.domElement.style.zIndex = '0'; 
-    document.getElementById('close-content').onclick = exitResumeContent;
-    contentDiv.style.display = 'block';
-}
-
-function exitResumeContent() {
-    const contentDiv = document.getElementById('resume-content');
-    if (contentDiv) {
-        contentDiv.style.display = 'none';
+    if (!contentDiv) {
+        contentDiv = document.createElement('div');
+        contentDiv.id = 'resume-content';
+        // Basic styling
+        Object.assign(contentDiv.style, {
+            position: 'absolute', top: '20px', left: '20px', 
+            background: 'rgba(0,0,0,0.85)', color: 'white', 
+            padding: '20px', borderRadius: '8px', maxWidth: '300px', 
+            display: 'none', fontFamily: 'Arial, sans-serif', border: '1px solid #444'
+        });
+        document.body.appendChild(contentDiv);
     }
     
-    renderer.domElement.style.zIndex = '1'; 
-    controls.target.set(0, 0, 0);
-    controls.minDistance = 0; 
-    controls.maxDistance = Infinity; 
-    controls.update();
+    contentDiv.innerHTML = `<button id="close-content" style="float:right; cursor:pointer;">X</button><h3 style="margin-top:0">${data.title}</h3>${data.content}`;
+    contentDiv.style.display = 'block';
+    
+    document.getElementById('close-content').onclick = () => {
+        contentDiv.style.display = 'none';
+        controls.target.set(0, 0, 0); 
+        controls.update();
+    };
 }
 
-// --- Interaction Handlers (Pointer Move, Hover, and Click) ---
-
+// Mouse Handlers
 function onPointerMove(event) {
     pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
     pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
 }
 
 function handleHover() {
-    // NEW CHECK: Disable hover if controls are still moving/damping
-    if (IS_CONTROLS_MOVING) {
-        if (INTERSECTED) {
-            INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
-            INTERSECTED = null;
-        }
-        return;
-    } 
+    if (IS_CONTROLS_MOVING) return;
     
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
@@ -213,42 +169,30 @@ function handleHover() {
     if (intersects.length > 0) {
         const hitFace = intersects[0].object;
         if (INTERSECTED !== hitFace) {
-            if (INTERSECTED) {
-                INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
-            }
+            if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
             INTERSECTED = hitFace;
-            INTERSECTED.material.emissive.setHex(0x00ffcc); 
+            INTERSECTED.material.emissive.setHex(0xFFD700); // Hover Color
         }
     } else {
-        if (INTERSECTED) {
-            INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
-        }
+        if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
         INTERSECTED = null;
     }
 }
 
 function onClick(event) {
-    // NEW CHECK: Disable click if controls are still moving/damping
-    if (IS_CONTROLS_MOVING) return; 
-
+    if (IS_CONTROLS_MOVING) return;
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
-
-    if (intersects.length > 0) {
-        handleFaceClick(intersects[0].object); 
-    }
+    if (intersects.length > 0) handleFaceClick(intersects[0].object);
 }
 
-// --- Event Listeners ---
 window.addEventListener('pointermove', onPointerMove);
 window.addEventListener('click', onClick);
 
-
-// --- Animation Loop ---
+// --- 6. Animation Loop ---
 function animate() {
     requestAnimationFrame(animate);
-
-    controls.update(); 
+    controls.update();
     handleHover();
     renderer.render(scene, camera);
 }
