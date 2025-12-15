@@ -58,55 +58,42 @@ gltfLoader.load(
 
         model.traverse(function (child) {
             if (child.isMesh) {
-                // LOG NAMES: This helps confirm which mesh is which
                 console.log("Loaded mesh:", child.name);
 
-                // --- FILTER LOGIC ---
-                // If the object is named "Inside" (or whatever your core is called), skip adding it to clickable list
-                // You can check the console logs to see the exact name if "Inside" isn't it.
-                if (child.name.includes("Inside") || child.name.includes("Core")) {
-                    // Make the inside glow but NOT be clickable?
-                    child.material = child.material.clone();
-                    child.material.emissiveIntensity = 2.0; // Make core brighter
-                    return; // Skip the rest of the loop for this object
-                }
-
                 faceCount++;
-                        
                 child.userData.id = faceCount;
                 child.userData.title = child.name || `Experience ${faceCount}`;
                 child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>Description...</p>`;
 
-                /// --- MATERIAL OVERRIDE (PURPLE GLASS) ---
-                // --- MATERIAL OVERRIDE (PURPLE & SHINY) ---
+                // --- MATERIAL SETUP ---
                 child.material = child.material.clone();
 
-                // 1. CRITICAL: Remove the green texture so it doesn't override our color
-                child.material.map = null; 
+                // Special handling for the "Inside" core vs Outer Shells
+                if (child.name.includes("Inside") || child.name.includes("Core")) {
+                    child.material.emissive.setHex(0x220022); 
+                } else {
+                    // OUTER SHELLS (Purple Glass)
+                    child.material.map = null; 
+                    child.material.color.setHex(0x800080); // Purple
+                    child.material.emissive.setHex(0x220022); 
+                    child.material.roughness = 0.1; 
+                    child.material.metalness = 0.6; 
+                    child.material.transparent = true;
+                    child.material.opacity = 0.5; 
+                }
 
-                // 2. Set the Base Color to Purple
-                child.material.color.setHex(0x800080); 
-
-                // 3. Set the Glow (Emissive) to be dark or matching purple
-                // (If we don't change this, it might still glow green!)
-                child.material.emissive.setHex(0x220022); // subtle purple glow
-
-                // 4. Glass/Metal Settings
-                child.material.roughness = 0.1; 
-                child.material.metalness = 0.6; 
-                child.material.transparent = true;
-                child.material.opacity = 0.5; 
-
-                // 5. Save the new purple glow so hover works correctly
+                // Save original glow for hover reset
                 child.userData.originalEmissive = child.material.emissive.getHex();
-                // Only add the outer panels to the clickable list
+                
+                // IMPORTANT: NOW WE ADD EVERYONE TO THE LIST
                 CLICKABLE_FACES.push(child);
             }
-            
         });
 
-        console.log(`Model loaded. Found ${faceCount} clickable faces (plus inner core).`);
+        console.log(`Model loaded. Found ${faceCount} clickable faces.`);
     },
+    // ... (error handlers remain the same)
+
     undefined,
     function (error) {
         console.error(`Error loading model from ${modelPath}:`, error);
