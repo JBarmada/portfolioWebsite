@@ -5,23 +5,59 @@ import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const base = import.meta.env.BASE_URL;
 
-const FADE_START = 2600;   // start shrinking here
-const FADE_END   = 3300;   // fully gone here (and star fully on)
+// ============================================================================
+// 🛠️ CONFIGURATION - TWEAK VALUES HERE
+// ============================================================================
 
-const STAR_SIZE_MULT = 0.10; // bigger = star appears larger at distance
-const MAXDIST = 10000;
-const CAMFAR = 20000;
+const CONFIG = {
+  // --- Camera & Navigation ---
+  focusDistance: 35,          // How close the camera zooms to a face when clicked
+  homeDistance: 255,          // Initial distance of the camera from center
+  camFov: 75,                 // Field of View
+  camFar: 20000,              // Draw distance (how far the camera sees)
+  minZoom: 10,                // Closest you can zoom in manually
+  maxZoom: 10000,             // Furthest you can zoom out manually
+  autoMoveSpeed: 0.08,        // Speed of the smooth camera transition (0.01 = slow, 0.1 = fast)
 
-// --- 1. Global Setup ---
+  // --- Lighting & Rendering ---
+  ambientLightIntensity: 0.2, // Brightness of the general base light
+  exposure: 1.0,              // Overall scene brightness (Tone Mapping)
+  bgDimOpacity: 0.17,         // Darkness of the overlay covering the 3D scene (0.0 - 1.0)
+  
+  // --- Star Transformation ---
+  fadeStart: 2600,            // Distance where the model starts shrinking into a star
+  fadeEnd: 3300,              // Distance where the model is fully gone (star is active)
+  starSizeMultiplier: 0.10,   // How much the star grows based on distance
+  starBaseSize: 250,          // Base pixel size of the star glow
+  starPulseSpeed: 0.003,      // How fast the star gently pulses
+
+  // --- Colors & Materials ---
+  colorBase: 0x800080,        // Purple color for non-core faces
+  colorEmissive: 0x220022,    // Inner glow color for faces
+  colorHighlight: 0xffd700,   // Gold color when hovering over a face
+  materialOpacity: 0.5,       // Transparency of the outer faces
+  materialRoughness: 0.1,     // Shininess (0 = mirror, 1 = matte)
+  materialMetalness: 0.6,     // Metallic look (0 = plastic, 1 = metal)
+
+  // --- Interaction ---
+  doubleTapDelay: 300,        // Milliseconds to register a double-tap on mobile
+};
+
+// ============================================================================
+// 1. GLOBAL SETUP
+// ============================================================================
+
 const scene = new THREE.Scene();
-const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, CAMFAR);
+const camera = new THREE.PerspectiveCamera(CONFIG.camFov, window.innerWidth / window.innerHeight, 0.1, CONFIG.camFar);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
-renderer.toneMappingExposure = 1.0;
+renderer.toneMappingExposure = CONFIG.exposure;
 document.body.appendChild(renderer.domElement);
+
+// --- HTML Overlays ---
 
 // Debug overlay
 const debug = document.createElement('div');
@@ -43,7 +79,7 @@ const bgDim = document.createElement('div');
 Object.assign(bgDim.style, {
   position: 'fixed',
   inset: '0',
-  background: 'rgba(0, 0, 0, 0.27)',
+  background: `rgba(0, 0, 0, ${CONFIG.bgDimOpacity})`,
   pointerEvents: 'none',
   zIndex: '1',
 });
@@ -53,43 +89,50 @@ document.body.appendChild(bgDim);
 renderer.domElement.style.position = 'fixed';
 renderer.domElement.style.inset = '0';
 renderer.domElement.style.zIndex = '0';
+renderer.domElement.style.touchAction = 'none'; // Critical for mobile gestures
 
-// --- 2. Controls ---
+// ============================================================================
+// 2. CONTROLS & CAMERA
+// ============================================================================
+
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
+controls.minDistance = CONFIG.minZoom;
+controls.maxDistance = CONFIG.maxZoom;
 
-controls.minDistance = 10;
-controls.maxDistance = MAXDIST;
-
-camera.position.set(0, 0, 255);
+// Initial Position
+camera.position.set(0, 0, CONFIG.homeDistance);
 controls.target.set(0, 0, 0);
 controls.update();
 
-// Smooth camera motion vars
+// Smooth camera motion variables
 const focusPoint = new THREE.Vector3(0, 0, 0);
 const desiredCameraPos = new THREE.Vector3().copy(camera.position);
 let isAutoMoving = false;
 
-// Home view
+// Home Targets
 const homeTarget = new THREE.Vector3(0, 0, 0);
-const homeCameraPos = new THREE.Vector3(0, 0, 255);
+const homeCameraPos = new THREE.Vector3(0, 0, CONFIG.homeDistance);
 
-// Cancel auto-move on user input
+// Cancel auto-move on user input (manual control override)
 controls.addEventListener('start', () => { isAutoMoving = false; });
 renderer.domElement.addEventListener('wheel', () => { isAutoMoving = false; }, { passive: true });
 
-// --- 3. Lighting & Environment ---
-scene.add(new THREE.AmbientLight(0xffffff, 0.2));
+// ============================================================================
+// 3. LIGHTING & ENVIRONMENT
+// ============================================================================
 
-// HDR environment
+scene.add(new THREE.AmbientLight(0xffffff, CONFIG.ambientLightIntensity));
+
+// HDR Environment
 const rgbeLoader = new HDRLoader();
 rgbeLoader.load(`${base}textures/neon_photostudio_4k.hdr`, (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
 });
 
-// Background sky sphere
+// Background Sky Sphere
 const textureLoader = new THREE.TextureLoader();
 let skySphere = null;
 
@@ -110,18 +153,20 @@ textureLoader.load(`${base}textures/starts.jpg`, (texture) => {
   scene.add(skySphere);
 });
 
-// --- 4. Model Loading ---
+// ============================================================================
+// 4. MODEL LOADING & STAR CREATION
+// ============================================================================
+
 const gltfLoader = new GLTFLoader();
 const modelPath = `${base}engram1.glb`;
 const CLICKABLE_FACES = [];
+const facesById = {};
 
 let modelRoot = null;
-
-// Center anchor that remains valid even when modelRoot becomes invisible
 let modelCenterAnchor = null;
 const modelCenterWorld = new THREE.Vector3();
 
-// ---- Star sprite ----
+// --- Star Sprite Generator ---
 function makeGlowTexture(size = 256) {
   const canvas = document.createElement('canvas');
   canvas.width = size;
@@ -133,7 +178,6 @@ function makeGlowTexture(size = 256) {
   const r = size / 2;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  // --- PURPLE STAR ---
   grad.addColorStop(0.0, 'rgba(255,255,255,1)');        // white center
   grad.addColorStop(0.15, 'rgba(255, 220, 255, 0.9)');  // bright whitish-purple
   grad.addColorStop(0.5, 'rgba(180, 40, 220, 0.5)');    // purple halo
@@ -162,11 +206,12 @@ starSprite.frustumCulled = false;
 starSprite.renderOrder = 999;
 scene.add(starSprite);
 
+// --- Load GLTF ---
 gltfLoader.load(modelPath, (gltf) => {
   modelRoot = gltf.scene;
   scene.add(modelRoot);
 
-  // Build center anchor ONCE while model is visible
+  // Create anchor at center of model
   const box = new THREE.Box3().setFromObject(modelRoot);
   const center = new THREE.Vector3();
   box.getCenter(center);
@@ -186,42 +231,50 @@ gltfLoader.load(modelPath, (gltf) => {
 
     child.material = child.material.clone();
 
+    // Differentiate Core vs Outer Faces
     if (child.name.includes('Inside') || child.name.includes('Core')) {
-      child.material.emissive.setHex(0x220022);
+      child.material.emissive.setHex(CONFIG.colorEmissive);
       child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>You have found the core...</p>`;
     } else {
       child.material.map = null;
-      child.material.color.setHex(0x800080);
-      child.material.emissive.setHex(0x220022);
-      child.material.roughness = 0.1;
-      child.material.metalness = 0.6;
+      child.material.color.setHex(CONFIG.colorBase);
+      child.material.emissive.setHex(CONFIG.colorEmissive);
+      child.material.roughness = CONFIG.materialRoughness;
+      child.material.metalness = CONFIG.materialMetalness;
       child.material.transparent = true;
-      child.material.opacity = 0.5;
+      child.material.opacity = CONFIG.materialOpacity;
     }
 
     child.userData.originalEmissive = child.material.emissive.getHex();
+    
+    // Store for lookup
+    facesById[faceCount] = child;
     CLICKABLE_FACES.push(child);
   });
 });
 
-// --- 5. Interaction Logic ---
+// ============================================================================
+// 5. INTERACTION LOGIC
+// ============================================================================
+
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let INTERSECTED = null;
-
 let isDragging = false;
 let startX = 0;
 let startY = 0;
-
-// fallback “double click/tap”
-let lastPointerUpTime = 0;
+let lastPointerUpTime = 0; // For double-tap logic
 
 function updatePointerFromEvent(e) {
-  pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
-  pointer.y = -(e.clientY / window.innerHeight) * 2 + 1;
+  // Support both mouse and touch events
+  const clientX = e.clientX || (e.touches && e.touches[0]?.clientX);
+  const clientY = e.clientY || (e.touches && e.touches[0]?.clientY);
+
+  if (clientX !== undefined) pointer.x = (clientX / window.innerWidth) * 2 - 1;
+  if (clientY !== undefined) pointer.y = -(clientY / window.innerHeight) * 2 + 1;
 }
 
-// --- CLICK HANDLER ---
+// --- Main Action: Click on Face ---
 function handleFaceClick(faceMesh) {
   const faceCenter = new THREE.Vector3();
   faceMesh.getWorldPosition(faceCenter);
@@ -229,13 +282,15 @@ function handleFaceClick(faceMesh) {
   focusPoint.copy(faceCenter);
 
   const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
-  const distance = 35;
-  desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(distance));
+  
+  // Calculate new camera position based on CONFIG.focusDistance
+  desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
 
   isAutoMoving = true;
   displayResumeContent(faceMesh.userData);
 }
 
+// --- UI: Resume Content ---
 function displayResumeContent(data) {
   let contentDiv = document.getElementById('resume-content');
   if (!contentDiv) {
@@ -270,7 +325,7 @@ function displayResumeContent(data) {
   };
 }
 
-// --- RESET LOGIC ---
+// --- Main Action: Reset View ---
 function resetEngram() {
   const contentDiv = document.getElementById('resume-content');
   if (contentDiv) contentDiv.style.display = 'none';
@@ -285,7 +340,7 @@ function resetEngram() {
   }
 }
 
-// --- STAR HIT TEST ---
+// --- Star Interaction ---
 function tryStarDoubleClick() {
   if (!starSprite.visible) return false;
 
@@ -299,7 +354,9 @@ function tryStarDoubleClick() {
   return false;
 }
 
-// pointer events
+// --- Event Listeners ---
+
+// 1. Pointer Down
 renderer.domElement.addEventListener('pointerdown', (e) => {
   updatePointerFromEvent(e);
   isDragging = false;
@@ -308,35 +365,37 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
   isAutoMoving = false;
 });
 
+// 2. Pointer Move
 renderer.domElement.addEventListener('pointermove', (e) => {
   updatePointerFromEvent(e);
   if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) isDragging = true;
 });
 
+// 3. Pointer Up (Click Handling)
 renderer.domElement.addEventListener('pointerup', (e) => {
   updatePointerFromEvent(e);
   if (isDragging) return;
 
-  // double tap fallback
   const now = performance.now();
-  const isDouble = (now - lastPointerUpTime) < 300;
+  const isDouble = (now - lastPointerUpTime) < CONFIG.doubleTapDelay;
   lastPointerUpTime = now;
 
-  // If it was a double AND the star is under pointer, reset and stop.
+  // Priority 1: Star Double Tap (Mobile)
   if (isDouble && tryStarDoubleClick()) return;
 
-  // normal: faces
+  // Priority 2: Face Click
   raycaster.setFromCamera(pointer, camera);
   const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
   if (intersects.length > 0) handleFaceClick(intersects[0].object);
 });
 
-// True dblclick
+// 4. Desktop Double Click
 renderer.domElement.addEventListener('dblclick', (e) => {
   updatePointerFromEvent(e);
   tryStarDoubleClick();
 });
 
+// 5. Hover Effect
 function handleHover() {
   if (isDragging) return;
 
@@ -348,7 +407,7 @@ function handleHover() {
     if (INTERSECTED !== hitFace) {
       if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
       INTERSECTED = hitFace;
-      INTERSECTED.material.emissive.setHex(0xffd700);
+      INTERSECTED.material.emissive.setHex(CONFIG.colorHighlight);
     }
   } else {
     if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
@@ -356,25 +415,43 @@ function handleHover() {
   }
 }
 
-// resize
+// 6. Keyboard Controls
+window.addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') {
+    resetEngram();
+    return;
+  }
+
+  const keyMap = {
+    '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
+    '6': 6, '7': 7, '8': 8, '9': 9,
+    '0': 10, '-': 11, '=': 12
+  };
+
+  const targetId = keyMap[e.key];
+  if (targetId && facesById[targetId]) {
+    handleFaceClick(facesById[targetId]);
+  }
+});
+
+// 7. Window Resize
 window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ESC resets view
-window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') resetEngram();
-});
+// ============================================================================
+// 6. ANIMATION LOOP
+// ============================================================================
 
-// --- 6. Animation Loop ---
 function animate() {
   requestAnimationFrame(animate);
 
+  // Smooth Camera Movement
   if (isAutoMoving) {
-    controls.target.lerp(focusPoint, 0.08);
-    camera.position.lerp(desiredCameraPos, 0.08);
+    controls.target.lerp(focusPoint, CONFIG.autoMoveSpeed);
+    camera.position.lerp(desiredCameraPos, CONFIG.autoMoveSpeed);
 
     if (camera.position.distanceTo(desiredCameraPos) < 0.05) {
       isAutoMoving = false;
@@ -384,50 +461,53 @@ function animate() {
   controls.update();
   handleHover();
 
-  // sky sphere
+  // Sky Sphere Follow
   if (skySphere) {
     skySphere.position.copy(camera.position);
     skySphere.rotation.y = controls.getAzimuthalAngle();
   }
 
-  // --- Fade model into star ---
+  // --- Dynamic Model/Star Fading ---
   if (modelRoot && modelCenterAnchor) {
     modelCenterAnchor.getWorldPosition(modelCenterWorld);
     const dist = camera.position.distanceTo(modelCenterWorld);
 
-    // 0 at FADE_START, 1 at FADE_END
-    const t = THREE.MathUtils.clamp((dist - FADE_START) / (FADE_END - FADE_START), 0, 1);
+    // Calculate fade progress (0.0 to 1.0)
+    const t = THREE.MathUtils.clamp((dist - CONFIG.fadeStart) / (CONFIG.fadeEnd - CONFIG.fadeStart), 0, 1);
 
-    // shrink model
+    // Shrink model
     const modelScale = 1 - t;
     modelRoot.scale.setScalar(Math.max(modelScale, 0.0001));
 
-    // fade materials
+    // Fade model materials
     modelRoot.traverse((o) => {
       if (!o.isMesh) return;
       const m = o.material;
       if (!m) return;
+      
+      const isCore = o.name?.includes('Inside') || o.name?.includes('Core');
       m.transparent = true;
-      m.opacity = (o.name?.includes('Inside') || o.name?.includes('Core')) ? 1 : (0.5 * (1 - t));
+      m.opacity = isCore ? 1 : (CONFIG.materialOpacity * (1 - t));
     });
 
-    // star fades in
+    // Handle Star visibility
     starSprite.visible = t > 0;
     if (t > 0) {
       starSprite.position.copy(modelCenterWorld);
 
       const distToStar = camera.position.distanceTo(modelCenterWorld);
 
-      // base size grows with t
-      let visualSize = THREE.MathUtils.lerp(0, 250, t);
+      // Base size transition
+      let visualSize = THREE.MathUtils.lerp(0, CONFIG.starBaseSize, t);
 
-      // distance compensation
-      const distFactor = (distToStar / 1000) * STAR_SIZE_MULT;
+      // Distance compensation (keeps star visible when far away)
+      const distFactor = (distToStar / 1000) * CONFIG.starSizeMultiplier;
       visualSize = visualSize * (1 + distFactor);
 
       starSprite.scale.setScalar(visualSize);
 
-      const tw = 0.85 + 0.15 * Math.sin(performance.now() * 0.003);
+      // Subtle pulse animation
+      const tw = 0.85 + 0.15 * Math.sin(performance.now() * CONFIG.starPulseSpeed);
       starSprite.material.opacity = t * tw;
     }
   }
