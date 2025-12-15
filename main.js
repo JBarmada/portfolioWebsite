@@ -18,110 +18,84 @@ const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
 controls.dampingFactor = 0.05;
 camera.position.z = 255; 
-controls.update();
 
-let IS_CONTROLS_MOVING = false;
-controls.addEventListener('start', () => { IS_CONTROLS_MOVING = true; });
-controls.addEventListener('end', () => { setTimeout(() => { IS_CONTROLS_MOVING = false; }, 100); });
+// --- SMOOTH PANNING VARIABLES ---
+// We use this vector to store where we WANT to look.
+const focusPoint = new THREE.Vector3(0, 0, 0); 
 
-// --- 3. Lighting & Environment (The "Shiny" Logic) ---
-
+// --- 3. Lighting & Environment ---
 scene.add(new THREE.AmbientLight(0xffffff, 0.2));
 
 const rgbeLoader = new HDRLoader();
-// FIX: Added leading slash '/' to ensure it looks in root/public
 rgbeLoader.load(
     '/textures/neon_photostudio_4k.hdr', 
     function (texture) {
         texture.mapping = THREE.EquirectangularReflectionMapping;
         scene.environment = texture;
-        console.log("HDRI loaded successfully.");
-    },
-    undefined,
-    function (error) {
-        console.error("CRITICAL ERROR: HDRI 404. Ensure 'neon_photostudio_1k.hdr' is in 'public/textures/' folder.");
     }
 );
 
 // --- 4. Model Loading ---
-
 const gltfLoader = new GLTFLoader();
-const modelPath = '/engram1.glb'; // Ensure this matches your file name exactly
+const modelPath = '/engram1.glb'; 
 const CLICKABLE_FACES = [];
-let faceCount = 0;
 
-gltfLoader.load(
-    modelPath,
-    function (gltf) {
-        const model = gltf.scene;
-        scene.add(model);
+gltfLoader.load(modelPath, function (gltf) {
+    const model = gltf.scene;
+    scene.add(model);
 
-        model.traverse(function (child) {
-            if (child.isMesh) {
-                console.log("Loaded mesh:", child.name);
+    let faceCount = 0;
+    model.traverse(function (child) {
+        if (child.isMesh) {
+            faceCount++;
+            child.userData.id = faceCount;
+            child.userData.title = child.name || `Experience ${faceCount}`;
+            child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>Description...</p>`;
 
-                faceCount++;
-                child.userData.id = faceCount;
-                child.userData.title = child.name || `Experience ${faceCount}`;
-                child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>Description...</p>`;
+            child.material = child.material.clone();
 
-                // --- MATERIAL SETUP ---
-                child.material = child.material.clone();
-
-                // Special handling for the "Inside" core vs Outer Shells
-                if (child.name.includes("Inside") || child.name.includes("Core")) {
-                    child.material.emissive.setHex(0x220022); 
-                } else {
-                    // OUTER SHELLS (Purple Glass)
-                    child.material.map = null; 
-                    child.material.color.setHex(0x800080); // Purple
-                    child.material.emissive.setHex(0x220022); 
-                    child.material.roughness = 0.1; 
-                    child.material.metalness = 0.6; 
-                    child.material.transparent = true;
-                    child.material.opacity = 0.5; 
-                }
-
-                // Save original glow for hover reset
-                child.userData.originalEmissive = child.material.emissive.getHex();
-                
-                // IMPORTANT: NOW WE ADD EVERYONE TO THE LIST
-                CLICKABLE_FACES.push(child);
+            // Inner Core vs Outer Shell Logic
+            if (child.name.includes("Inside") || child.name.includes("Core")) {
+                child.material.emissive.setHex(0x220022); 
+            } else {
+                child.material.map = null; 
+                child.material.color.setHex(0x800080); // Purple
+                child.material.emissive.setHex(0x220022); 
+                child.material.roughness = 0.1; 
+                child.material.metalness = 0.6; 
+                child.material.transparent = true;
+                child.material.opacity = 0.5; 
             }
-        });
 
-        console.log(`Model loaded. Found ${faceCount} clickable faces.`);
-    },
-    // ... (error handlers remain the same)
-
-    undefined,
-    function (error) {
-        console.error(`Error loading model from ${modelPath}:`, error);
-    }
-);
+            child.userData.originalEmissive = child.material.emissive.getHex();
+            CLICKABLE_FACES.push(child);
+        }
+    });
+});
 
 // --- 5. Interaction Logic ---
-
 const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let INTERSECTED = null;
 
-const faceCenter = new THREE.Vector3();
+// --- CLICK HANDLER (UPDATED) ---
 function handleFaceClick(faceMesh) {
-    faceMesh.getWorldPosition(faceCenter);
-    controls.target.copy(faceCenter);
-    camera.lookAt(faceCenter);
-    controls.update();
+    // 1. Get the position of the clicked face
+    const tempVec = new THREE.Vector3();
+    faceMesh.getWorldPosition(tempVec);
+
+    // 2. Tell our smooth-pan system: "Start moving towards this point"
+    focusPoint.copy(tempVec);
+    
+    // 3. Show UI
     displayResumeContent(faceMesh.userData);
 }
 
-// UI Logic
 function displayResumeContent(data) {
     let contentDiv = document.getElementById('resume-content');
     if (!contentDiv) {
         contentDiv = document.createElement('div');
         contentDiv.id = 'resume-content';
-        // Basic styling
         Object.assign(contentDiv.style, {
             position: 'absolute', top: '20px', left: '20px', 
             background: 'rgba(0,0,0,0.85)', color: 'white', 
@@ -134,31 +108,44 @@ function displayResumeContent(data) {
     contentDiv.innerHTML = `<button id="close-content" style="float:right; cursor:pointer;">X</button><h3 style="margin-top:0">${data.title}</h3>${data.content}`;
     contentDiv.style.display = 'block';
     
+    // --- CLOSE BUTTON (UPDATED) ---
     document.getElementById('close-content').onclick = () => {
         contentDiv.style.display = 'none';
-        controls.target.set(0, 0, 0); 
-        controls.update();
+        
+        // Reset the focus point to Origin (0,0,0)
+        focusPoint.set(0, 0, 0); 
     };
 }
 
-// Mouse Handlers
-function onPointerMove(event) {
-    pointer.x = (event.clientX / window.innerWidth) * 2 - 1;
-    pointer.y = - (event.clientY / window.innerHeight) * 2 + 1;
-}
+// --- MOUSE LOGIC ---
+let isDragging = false;
+let startX = 0;
+let startY = 0;
+
+window.addEventListener('pointerdown', (e) => { isDragging = false; startX = e.clientX; startY = e.clientY; });
+window.addEventListener('pointermove', (e) => {
+    pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
+    pointer.y = - (e.clientY / window.innerHeight) * 2 + 1;
+    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) isDragging = true;
+});
+window.addEventListener('pointerup', () => {
+    if (!isDragging) {
+        raycaster.setFromCamera(pointer, camera);
+        const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
+        if (intersects.length > 0) handleFaceClick(intersects[0].object);
+    }
+});
 
 function handleHover() {
-    if (IS_CONTROLS_MOVING) return;
-    
+    if (isDragging) return;
     raycaster.setFromCamera(pointer, camera);
     const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
-
     if (intersects.length > 0) {
         const hitFace = intersects[0].object;
         if (INTERSECTED !== hitFace) {
             if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
             INTERSECTED = hitFace;
-            INTERSECTED.material.emissive.setHex(0xFFD700); // Hover Color
+            INTERSECTED.material.emissive.setHex(0xFFD700);
         }
     } else {
         if (INTERSECTED) INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
@@ -166,20 +153,16 @@ function handleHover() {
     }
 }
 
-function onClick(event) {
-    if (IS_CONTROLS_MOVING) return;
-    raycaster.setFromCamera(pointer, camera);
-    const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
-    if (intersects.length > 0) handleFaceClick(intersects[0].object);
-}
-
-window.addEventListener('pointermove', onPointerMove);
-window.addEventListener('click', onClick);
-
-// --- 6. Animation Loop ---
+// --- 6. Animation Loop (UPDATED) ---
 function animate() {
     requestAnimationFrame(animate);
-    controls.update();
+    
+    // --- SMOOTH CAMERA PANNING ---
+    // Every frame, move the controls target 5% closer to the focusPoint
+    // This creates the smooth "slide" effect.
+    controls.target.lerp(focusPoint, 0.05);
+
+    controls.update(); // Must be called after changing target
     handleHover();
     renderer.render(scene, camera);
 }
