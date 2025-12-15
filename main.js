@@ -1,7 +1,8 @@
 import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
-import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+// CHANGED: Import TrackballControls instead of OrbitControls
+import { TrackballControls } from 'three/addons/controls/TrackballControls.js';
 import { RESUME_DATA } from './resumeData.js';
 
 const base = import.meta.env.BASE_URL;
@@ -19,6 +20,13 @@ const CONFIG = {
   minZoom: 10,                // Closest you can zoom in manually
   maxZoom: 10000,             // Furthest you can zoom out manually
   autoMoveSpeed: 0.08,        // Speed of the smooth camera transition (0.01 = slow, 0.1 = fast)
+
+  // --- Trackball Controls Settings (New) ---
+  rotateSpeed: 4.0,           // How fast the object spins when dragging
+  zoomSpeed: 1.2,             // How fast you zoom in/out
+  panSpeed: 0.8,              // How fast you pan (right-click drag)
+  dampingFactor: 0.1,         // Smoothness of the drift after letting go (lower = longer drift)
+  staticMoving: false,        // If true, rotation stops immediately (no drift)
 
   // --- Lighting & Rendering ---
   ambientLightIntensity: 0.2, // Brightness of the general base light
@@ -96,9 +104,16 @@ renderer.domElement.style.touchAction = 'none'; // Critical for mobile gestures
 // 2. CONTROLS & CAMERA
 // ============================================================================
 
-const controls = new OrbitControls(camera, renderer.domElement);
-controls.enableDamping = true;
-controls.dampingFactor = 0.05;
+// CHANGED: Use TrackballControls for free 360 rotation
+const controls = new TrackballControls(camera, renderer.domElement);
+
+// Apply Config Settings
+controls.rotateSpeed = CONFIG.rotateSpeed;
+controls.zoomSpeed = CONFIG.zoomSpeed;
+controls.panSpeed = CONFIG.panSpeed;
+controls.staticMoving = CONFIG.staticMoving;
+controls.dynamicDampingFactor = CONFIG.dampingFactor; // Controls the "drift" physics
+
 controls.minDistance = CONFIG.minZoom;
 controls.maxDistance = CONFIG.maxZoom;
 
@@ -229,7 +244,6 @@ gltfLoader.load(modelPath, (gltf) => {
     child.userData.id = faceCount;
     
     // 1. LOOK UP RESUME DATA 
-    // If we have data for this number, use it. Otherwise default.
     const resumeEntry = RESUME_DATA[faceCount];
     
     if (resumeEntry) {
@@ -245,9 +259,8 @@ gltfLoader.load(modelPath, (gltf) => {
     // 2. HANDLE CORE (FACE 13+) - Overrides everything else
     if (child.name.includes('Inside') || child.name.includes('Core')) {
       child.material.emissive.setHex(CONFIG.colorEmissive);
-      // Keep the core message mysterious
-      child.userData.title = "The Engram Core";
-      child.userData.content = `<h3>What am I?</h3><p>You have found the source...</p>`;
+      child.userData.title = "The Core";
+      child.userData.content = `<h3>The Engram Core</h3><p>You have found the source.</p>`;
     } else {
       // Standard Face Styling
       child.material.map = null;
@@ -453,6 +466,7 @@ window.addEventListener('resize', () => {
   camera.aspect = window.innerWidth / window.innerHeight;
   camera.updateProjectionMatrix();
   renderer.setSize(window.innerWidth, window.innerHeight);
+  controls.handleResize(); // REQUIRED for TrackballControls
 });
 
 // ============================================================================
@@ -464,6 +478,8 @@ function animate() {
 
   // Smooth Camera Movement
   if (isAutoMoving) {
+    // Note: Trackball target handling is slightly different, but this lerp still works
+    // effectively for the visual transition before we hand control back to the user.
     controls.target.lerp(focusPoint, CONFIG.autoMoveSpeed);
     camera.position.lerp(desiredCameraPos, CONFIG.autoMoveSpeed);
 
@@ -472,13 +488,14 @@ function animate() {
     }
   }
 
-  controls.update();
+  controls.update(); // Must be called every frame
   handleHover();
 
-  // Sky Sphere Follow
+  // Sky Sphere Follow - adjusted to remove Y rotation lock if desired, 
+  // or keep it simple. Here we just copy position.
   if (skySphere) {
     skySphere.position.copy(camera.position);
-    skySphere.rotation.y = controls.getAzimuthalAngle();
+    // skySphere.rotation.y = ... (Trackball doesn't have an easy azimuthal angle, so we skip rotation matching for now to prevent jitter)
   }
 
   // --- Dynamic Model/Star Fading ---
