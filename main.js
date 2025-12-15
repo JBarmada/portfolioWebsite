@@ -291,6 +291,7 @@ let isDragging = false;
 let startX = 0;
 let startY = 0;
 let lastPointerUpTime = 0; // For double-tap logic
+let isPointerDown = false; // for hover logic
 
 function updatePointerFromEvent(e) {
   // Support both mouse and touch events
@@ -303,6 +304,12 @@ function updatePointerFromEvent(e) {
 
 // --- Main Action: Click on Face ---
 function handleFaceClick(faceMesh) {
+  // 1. Temporarily restore full scale to get accurate target coordinates
+  const currentScale = modelRoot.scale.x; // Save current "star" scale
+  modelRoot.scale.setScalar(1);           // Force full size
+  modelRoot.updateMatrixWorld(true);      // Update positions
+
+  // 2. Calculate the target position based on the Full-Size model
   const faceCenter = new THREE.Vector3();
   faceMesh.getWorldPosition(faceCenter);
 
@@ -310,9 +317,14 @@ function handleFaceClick(faceMesh) {
 
   const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
   
-  // Calculate new camera position based on CONFIG.focusDistance
+  // Calculate where the camera SHOULD be (outside the full-sized face)
   desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
 
+  // 3. Revert the model to its "star" size so the visual transition remains smooth
+  modelRoot.scale.setScalar(currentScale);
+  modelRoot.updateMatrixWorld(true);
+
+  // 4. Trigger movement
   isAutoMoving = true;
   displayResumeContent(faceMesh.userData);
 }
@@ -386,6 +398,7 @@ function tryStarDoubleClick() {
 // 1. Pointer Down
 renderer.domElement.addEventListener('pointerdown', (e) => {
   updatePointerFromEvent(e);
+  isPointerDown = true;
   isDragging = false;
   startX = e.clientX;
   startY = e.clientY;
@@ -395,13 +408,24 @@ renderer.domElement.addEventListener('pointerdown', (e) => {
 // 2. Pointer Move
 renderer.domElement.addEventListener('pointermove', (e) => {
   updatePointerFromEvent(e);
-  if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) isDragging = true;
+  // Only register a "drag" if we are actually holding the button down
+  if (isPointerDown) {
+    if (Math.abs(e.clientX - startX) > 5 || Math.abs(e.clientY - startY) > 5) {
+      isDragging = true;
+    }
+  }
 });
 
 // 3. Pointer Up (Click Handling)
 renderer.domElement.addEventListener('pointerup', (e) => {
   updatePointerFromEvent(e);
-  if (isDragging) return;
+  isPointerDown = false; // We let go
+
+  // If we were dragging, stop here (don't click), but reset the flag so hovering works again
+  if (isDragging) {
+    isDragging = false; 
+    return;
+  }
 
   const now = performance.now();
   const isDouble = (now - lastPointerUpTime) < CONFIG.doubleTapDelay;
