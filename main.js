@@ -2,7 +2,7 @@ import * as THREE from 'three';
 import { GLTFLoader } from 'three/addons/loaders/GLTFLoader.js';
 import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
-import { defineConfig } from 'vite';
+
 
 
 // --- 1. Global Setup ---
