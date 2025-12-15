@@ -18,6 +18,22 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
 
+// Darken overlay (keeps everything else unchanged)
+const bgDim = document.createElement('div');
+Object.assign(bgDim.style, {
+  position: 'fixed',
+  inset: '0',
+  background: 'rgba(0, 0, 0, 0.27)', // tweak 0.15–0.45
+  pointerEvents: 'none',
+  zIndex: '1'
+});
+document.body.appendChild(bgDim);
+
+// Make sure canvas is under overlay
+renderer.domElement.style.position = 'fixed';
+renderer.domElement.style.inset = '0';
+renderer.domElement.style.zIndex = '0';
+
 // --- 2. Controls ---
 const controls = new OrbitControls(camera, renderer.domElement);
 controls.enableDamping = true;
@@ -53,10 +69,28 @@ rgbeLoader.load('/textures/neon_photostudio_4k.hdr', (texture) => {
 
 // B. Load specific image for the background
 const textureLoader = new THREE.TextureLoader();
-// REPLACE THIS PATH with your actual background image
-textureLoader.load('/textures/space.png', (texture) => {
-  scene.background = texture;
+let skySphere = null;
+
+textureLoader.load('/textures/starts.jpg', (texture) => {
+  // Correct color handling for images
+  texture.colorSpace = THREE.SRGBColorSpace;
+
+  // Wrap so it doesn't stretch weird if you want repetition
+  texture.wrapS = THREE.RepeatWrapping;
+  texture.wrapT = THREE.RepeatWrapping;
+  texture.repeat.set(2, 1); // tweak if you want more/less repetition
+
+  const skyGeo = new THREE.SphereGeometry(500, 64, 64);
+  const skyMat = new THREE.MeshBasicMaterial({
+    map: texture,
+    side: THREE.BackSide, // render inside of sphere
+    depthWrite: false
+  });
+
+  skySphere = new THREE.Mesh(skyGeo, skyMat);
+  scene.add(skySphere);
 });
+
 
 // --- 4. Model Loading ---
 const gltfLoader = new GLTFLoader();
@@ -79,7 +113,8 @@ gltfLoader.load(modelPath, (gltf) => {
     child.material = child.material.clone();
 
     if (child.name.includes('Inside') || child.name.includes('Core')) {
-      child.material.emissive.setHex(0x220022);
+        child.material.emissive.setHex(0x220022);
+        child.userData.content = `<h3>Project: ${child.userData.title}</h3><p>You have found the core...</p>`;
     } else {
       child.material.map = null;
       child.material.color.setHex(0x800080);
@@ -214,18 +249,25 @@ window.addEventListener('keydown', (e) => {
 function animate() {
   requestAnimationFrame(animate);
 
-  if (isAutoMoving) {
-    controls.target.lerp(focusPoint, 0.08);
-    camera.position.lerp(desiredCameraPos, 0.08);
+    if (isAutoMoving) {
+        controls.target.lerp(focusPoint, 0.08);
+        camera.position.lerp(desiredCameraPos, 0.08);
 
-    if (camera.position.distanceTo(desiredCameraPos) < 0.05) {
-      isAutoMoving = false;
+        if (camera.position.distanceTo(desiredCameraPos) < 0.05) {
+        isAutoMoving = false;
+        }
     }
-  }
 
-  controls.update();
-  handleHover();
-  renderer.render(scene, camera);
+    controls.update();
+    handleHover();
+    // Keep the sky centered on the camera so it feels infinitely far,
+    // and rotate it with the camera so it "moves with you"
+    if (skySphere) {
+    skySphere.position.copy(camera.position);
+    skySphere.rotation.y = controls.getAzimuthalAngle(); // rotates only around Y
+    }
+
+    renderer.render(scene, camera);
 }
 
 animate();
