@@ -4,24 +4,26 @@ import { HDRLoader } from 'three/addons/loaders/HDRLoader.js';
 import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
 
 const base = import.meta.env.BASE_URL;
+
 const FADE_START = 2600;   // start shrinking here
 const FADE_END   = 3300;   // fully gone here (and star fully on)
-// const STAR_START_DISTANCE = 3000; // when model turns into star
-const STAR_SIZE_MULT = 0.10;      // bigger = star appears larger at distance
-// const STAR_MIN_SIZE = 80;
-// const STAR_MAX_SIZE = 900;
+
+const STAR_SIZE_MULT = 0.10; // bigger = star appears larger at distance
 const MAXDIST = 10000;
 const CAMFAR = 20000;
 
 // --- 1. Global Setup ---
 const scene = new THREE.Scene();
 const camera = new THREE.PerspectiveCamera(75, window.innerWidth / window.innerHeight, 0.1, CAMFAR);
+
 const renderer = new THREE.WebGLRenderer({ antialias: true });
 renderer.setSize(window.innerWidth, window.innerHeight);
 renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
 renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = 1.0;
 document.body.appendChild(renderer.domElement);
+
+// Debug overlay
 const debug = document.createElement('div');
 Object.assign(debug.style, {
   position: 'fixed',
@@ -36,13 +38,12 @@ Object.assign(debug.style, {
 });
 document.body.appendChild(debug);
 
-
 // Darken overlay
 const bgDim = document.createElement('div');
 Object.assign(bgDim.style, {
   position: 'fixed',
   inset: '0',
-  background: 'rgba(0, 0, 0, 0.27)', // tweak 0.15–0.45
+  background: 'rgba(0, 0, 0, 0.27)',
   pointerEvents: 'none',
   zIndex: '1',
 });
@@ -132,18 +133,18 @@ function makeGlowTexture(size = 256) {
   const r = size / 2;
 
   const grad = ctx.createRadialGradient(cx, cy, 0, cx, cy, r);
-  // --- COLOR CHANGE HERE ---
-  grad.addColorStop(0.0, 'rgba(255,255,255,1)');       // Pure white center
-  grad.addColorStop(0.15, 'rgba(255, 220, 255, 0.9)'); // very bright whitish-purple transition
-    grad.addColorStop(0.5, 'rgba(180, 40, 220, 0.5)');   // The main purple halo color (adjusted for glow)
-    grad.addColorStop(1.0, 'rgba(0,0,0,0)');             // fade to transparent edge
+  // --- PURPLE STAR ---
+  grad.addColorStop(0.0, 'rgba(255,255,255,1)');        // white center
+  grad.addColorStop(0.15, 'rgba(255, 220, 255, 0.9)');  // bright whitish-purple
+  grad.addColorStop(0.5, 'rgba(180, 40, 220, 0.5)');    // purple halo
+  grad.addColorStop(1.0, 'rgba(0,0,0,0)');              // transparent edge
 
-    ctx.fillStyle = grad;
-    ctx.fillRect(0, 0, size, size);
+  ctx.fillStyle = grad;
+  ctx.fillRect(0, 0, size, size);
 
-    const tex = new THREE.CanvasTexture(canvas);
-    tex.colorSpace = THREE.SRGBColorSpace;
-    return tex;
+  const tex = new THREE.CanvasTexture(canvas);
+  tex.colorSpace = THREE.SRGBColorSpace;
+  return tex;
 }
 
 const starSprite = new THREE.Sprite(
@@ -152,12 +153,12 @@ const starSprite = new THREE.Sprite(
     transparent: true,
     blending: THREE.AdditiveBlending,
     depthWrite: false,
-    depthTest: false, // important: don’t get “lost” behind stuff
+    depthTest: false,
     opacity: 1.0,
   })
 );
 starSprite.visible = false;
-starSprite.frustumCulled = false; // FIX: Never stop rendering this, no matter how far/off-center
+starSprite.frustumCulled = false;
 starSprite.renderOrder = 999;
 scene.add(starSprite);
 
@@ -208,10 +209,12 @@ const raycaster = new THREE.Raycaster();
 const pointer = new THREE.Vector2();
 let INTERSECTED = null;
 
-// drag vs click
 let isDragging = false;
 let startX = 0;
 let startY = 0;
+
+// fallback “double click/tap”
+let lastPointerUpTime = 0;
 
 function updatePointerFromEvent(e) {
   pointer.x = (e.clientX / window.innerWidth) * 2 - 1;
@@ -225,8 +228,6 @@ function handleFaceClick(faceMesh) {
 
   focusPoint.copy(faceCenter);
 
-  // If your object is centered at origin, this works.
-  // If not, you may want to use the mesh forward direction approach.
   const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
   const distance = 35;
   desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(distance));
@@ -265,19 +266,37 @@ function displayResumeContent(data) {
   contentDiv.style.display = 'block';
 
   document.getElementById('close-content').onclick = () => {
-    closeResumeContent();
+    resetEngram();
   };
 }
 
-function closeResumeContent() {
+// --- RESET LOGIC ---
+function resetEngram() {
   const contentDiv = document.getElementById('resume-content');
-  if (!contentDiv || contentDiv.style.display === 'none') return;
-
-  contentDiv.style.display = 'none';
+  if (contentDiv) contentDiv.style.display = 'none';
 
   focusPoint.copy(homeTarget);
   desiredCameraPos.copy(homeCameraPos);
   isAutoMoving = true;
+
+  if (INTERSECTED) {
+    INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
+    INTERSECTED = null;
+  }
+}
+
+// --- STAR HIT TEST ---
+function tryStarDoubleClick() {
+  if (!starSprite.visible) return false;
+
+  raycaster.setFromCamera(pointer, camera);
+  const hit = raycaster.intersectObject(starSprite, false);
+
+  if (hit.length > 0) {
+    resetEngram();
+    return true;
+  }
+  return false;
 }
 
 // pointer events
@@ -298,9 +317,24 @@ renderer.domElement.addEventListener('pointerup', (e) => {
   updatePointerFromEvent(e);
   if (isDragging) return;
 
+  // double tap fallback
+  const now = performance.now();
+  const isDouble = (now - lastPointerUpTime) < 300;
+  lastPointerUpTime = now;
+
+  // If it was a double AND the star is under pointer, reset and stop.
+  if (isDouble && tryStarDoubleClick()) return;
+
+  // normal: faces
   raycaster.setFromCamera(pointer, camera);
   const intersects = raycaster.intersectObjects(CLICKABLE_FACES, false);
   if (intersects.length > 0) handleFaceClick(intersects[0].object);
+});
+
+// True dblclick
+renderer.domElement.addEventListener('dblclick', (e) => {
+  updatePointerFromEvent(e);
+  tryStarDoubleClick();
 });
 
 function handleHover() {
@@ -329,9 +363,9 @@ window.addEventListener('resize', () => {
   renderer.setSize(window.innerWidth, window.innerHeight);
 });
 
-// ESC closes content
+// ESC resets view
 window.addEventListener('keydown', (e) => {
-  if (e.key === 'Escape') closeResumeContent();
+  if (e.key === 'Escape') resetEngram();
 });
 
 // --- 6. Animation Loop ---
@@ -350,69 +384,55 @@ function animate() {
   controls.update();
   handleHover();
 
-  // sky sphere: infinite + rotates with orbit
+  // sky sphere
   if (skySphere) {
     skySphere.position.copy(camera.position);
     skySphere.rotation.y = controls.getAzimuthalAngle();
   }
 
-  // --- "Bright point when far away" ---
-    if (modelRoot && modelCenterAnchor) {
+  // --- Fade model into star ---
+  if (modelRoot && modelCenterAnchor) {
     modelCenterAnchor.getWorldPosition(modelCenterWorld);
     const dist = camera.position.distanceTo(modelCenterWorld);
 
     // 0 at FADE_START, 1 at FADE_END
     const t = THREE.MathUtils.clamp((dist - FADE_START) / (FADE_END - FADE_START), 0, 1);
 
-    // shrink model smoothly
+    // shrink model
     const modelScale = 1 - t;
     modelRoot.scale.setScalar(Math.max(modelScale, 0.0001));
 
-    // optional: also fade materials a bit (looks nicer)
+    // fade materials
     modelRoot.traverse((o) => {
-        if (!o.isMesh) return;
-        const m = o.material;
-        if (!m) return;
-        m.transparent = true;
-        m.opacity = (o.name?.includes('Inside') || o.name?.includes('Core')) ? 1 : (0.5 * (1 - t));
+      if (!o.isMesh) return;
+      const m = o.material;
+      if (!m) return;
+      m.transparent = true;
+      m.opacity = (o.name?.includes('Inside') || o.name?.includes('Core')) ? 1 : (0.5 * (1 - t));
     });
 
-    // star fades in as model fades out
-    starSprite.visible = t > 0;
-    // ... inside animate(), replacing the star logic ...
-
-    // star fades in as model fades out
+    // star fades in
     starSprite.visible = t > 0;
     if (t > 0) {
-        starSprite.position.copy(modelCenterWorld);
+      starSprite.position.copy(modelCenterWorld);
 
-        // Calculate distance from camera to the star
-        const distToStar = camera.position.distanceTo(modelCenterWorld);
+      const distToStar = camera.position.distanceTo(modelCenterWorld);
 
-        // 1. Base transition size (growing as model disappears)
-        let visualSize = THREE.MathUtils.lerp(0, 250, t);
+      // base size grows with t
+      let visualSize = THREE.MathUtils.lerp(0, 250, t);
 
-        // 2. Add Distance Compensation
-        // As we get further, multiply size so it doesn't shrink to a pixel
-        // This makes it look like a persistent light source rather than physical geometry
-        const distFactor = (distToStar / 1000) * STAR_SIZE_MULT; 
-        
-        // Apply the factor, but clamp slightly to avoid it becoming a giant sun
-        visualSize = visualSize * (1 + distFactor);
+      // distance compensation
+      const distFactor = (distToStar / 1000) * STAR_SIZE_MULT;
+      visualSize = visualSize * (1 + distFactor);
 
-        // Optional: Clamp to your config limits if it gets too huge
-        // visualSize = Math.min(visualSize, STAR_MAX_SIZE); 
+      starSprite.scale.setScalar(visualSize);
 
-        starSprite.scale.setScalar(visualSize);
-
-        const tw = 0.85 + 0.15 * Math.sin(performance.now() * 0.003);
-        starSprite.material.opacity = t * tw;
+      const tw = 0.85 + 0.15 * Math.sin(performance.now() * 0.003);
+      starSprite.material.opacity = t * tw;
     }
-    }
-
+  }
 
   renderer.render(scene, camera);
 }
 
 animate();
-// --- End of main.js ---
