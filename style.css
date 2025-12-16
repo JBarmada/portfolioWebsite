@@ -26,67 +26,140 @@ canvas {
     */
     z-index: 1; 
 }
-
-/*
-====================================================
-  2. RESUME CONTENT OVERLAY
+/* ====================================================
+  2. STAR WARS HOLOGRAM (TURBULENT GLITCH)
 ====================================================
 */
 
+:root {
+  --holo-color: #6daeb5;       
+  --holo-bg: rgba(0, 20, 50, 0.55); 
+}
+
 #resume-content {
-    /* Position over the canvas */
+    /* Positioning */
     position: absolute;
-    
-    /* CRITICAL: Must be higher than the default canvas z-index (1) */
     z-index: 100; 
-    
-    /* Initial state: Hidden */
-    display: none; 
-
-    /* Positioning and Sizing */
-    top: 10vh; /* 10% from the top */
-    right: 10vw; /* 10% from the right */
-    width: min(400px, 80%); /* Max width 400px, but responsive */
+    top: 15vh; right: 10vw; 
+    width: min(400px, 80%);
     padding: 25px;
+    
+    display: none; 
+    overflow: hidden; 
 
-    /* Appearance */
-    background: rgba(10, 20, 30, 0.95); /* Dark, semi-transparent background */
-    color: #FFFFFF;
-    border-radius: 8px;
-    box-shadow: 0 4px 15px rgba(0, 255, 204, 0.3); /* Subtle glow effect */
-    font-family: 'Arial', sans-serif;
-    line-height: 1.6;
+    /* HOLOGRAM BASE + STATIC GRID TEXTURE */
+    background-color: var(--holo-bg);
+    background-image: repeating-linear-gradient(
+        to bottom,
+        transparent 0px,
+        transparent 2px,
+        rgba(0, 255, 255, 0.03) 2px, 
+        rgba(0, 255, 255, 0.03) 4px
+    );
+
+    color: #aaddff;
+    
+    border: 1px solid rgba(109, 174, 181, 0.4);
+    box-shadow: 0 0 15px rgba(109, 174, 181, 0.2);
+    border-radius: 6px;
+        
+    /* Text Styles */
+    text-shadow: 0 0 5px rgba(109, 174, 181, 0.6);
+    font-family: "Consolas", "Monaco", "Courier New", monospace;
+    text-transform: uppercase;
+    letter-spacing: 1px;
+    line-height: 1.5;
+
+    /* APPLY THE SVG FILTER HERE */
+    filter: url(#holo-glitch-filter);
+
+    /* Subtle opacity flicker (CSS) + Blur */
+    animation: holo-flicker 4s infinite linear;
+    backdrop-filter: blur(2px);
+    
+    /* Ensure hardware acceleration for smoother filter */
+    transform: translateZ(0);
 }
 
-#resume-content h3 {
-    color: #00ffcc; /* Highlight color for headings */
-    margin-top: 0;
-    border-bottom: 1px solid rgba(0, 255, 204, 0.5);
-    padding-bottom: 10px;
+/* THE SLOW, TRANSPARENT SCANLINE */
+#resume-content::after {
+    content: " ";
+    display: block;
+    position: absolute;
+    left: 0; 
+    right: 0;
+    
+    /* Height of the scan bar */
+    height: 10%; 
+    
+    z-index: 102; 
+    pointer-events: none;
+
+    /* Very Transparent Gradient (Cyan/Teal) */
+    background: linear-gradient(
+        to bottom, 
+        transparent 0%, 
+        rgba(109, 174, 181, 0.15) 50%, /* 15% opacity = very subtle */
+        transparent 100%
+    );
+    
+    /* Optional: Faint glow, also very transparent */
+    box-shadow: 0 0 10px rgba(109, 174, 181, 0.1);
+
+    /* Animation: Slow (6s) and Periodic (Loops indefinitely) */
+    animation: scan-periodic 6s linear infinite;
 }
 
-/* Style for the Exit Button (X) */
-#close-content {
-    float: right;
-    background: none;
-    color: #FFFFFF;
-    border: 2px solid #FFFFFF;
-    border-radius: 50%;
-    width: 30px;
-    height: 30px;
-    font-size: 16px;
-    line-height: 1;
-    cursor: pointer;
-    transition: all 0.2s;
+/* ====================================================
+  ANIMATIONS
+====================================================
+*/
+@keyframes scan-periodic {
+    0% {
+        top: -10%; /* Start just above */
+    }
+    100% {
+        top: 110%; /* Move all the way down and restart */
+    }
+}
+@keyframes holo-glitch {
+    0%, 94% { transform: translate(0,0) skew(0deg); opacity: 0.95; }
+    95% { transform: translate(-2px, 0) skew(2deg); opacity: 0.9; }
+    96% { transform: translate(2px, 0) skew(-1deg); }
+    97% { transform: translate(0, 0) skew(0deg); }
+    98% { transform: translate(0, 2px) skew(0deg); opacity: 0.8; }
+    100% { transform: translate(0,0) skew(0deg); opacity: 0.95; }
 }
 
-#close-content:hover {
-    background: #00ffcc;
-    color: #000000;
-    border-color: #00ffcc;
+/* RANDOM MOVEMENT 1: erratic jumps */
+@keyframes scan-erratic-1 {
+    0%   { top: -20%; opacity: 0; }
+    10%  { top: 60%; opacity: 1; }  /* Drop to mid */
+    25%  { top: 20%; opacity: 0.8; } /* Jump back up */
+    40%  { top: 80%; opacity: 1; }   /* Drop low */
+    55%  { top: 120%; opacity: 0; }  /* Exit bottom */
+    70%  { top: 40%; opacity: 1; }   /* Reappear mid */
+    85%  { top: 10%; opacity: 0.5; } /* Hover top */
+    100% { top: -20%; opacity: 0; }  /* Exit top */
 }
 
+/* RANDOM MOVEMENT 2: slow drifting */
+@keyframes scan-erratic-2 {
+    0%   { top: 120%; opacity: 0; }
+    20%  { top: 10%; opacity: 1; }   /* Rise high */
+    40%  { top: 30%; opacity: 0.5; } /* Slight drop */
+    50%  { top: 15%; opacity: 1; }   /* Slight rise */
+    70%  { top: 90%; opacity: 1; }   /* Drop low */
+    85%  { top: 70%; opacity: 0.8; } /* Rise mid */
+    100% { top: 120%; opacity: 0; }  /* Exit bottom */
+}
 
+@keyframes holo-flicker {
+    0%, 92% { opacity: 0.95; }
+    93% { opacity: 0.89; }     /* Single, stronger flash */
+    94% { opacity: 0.95; }
+    100% { opacity: 0.95; }
+}
 /*
 ====================================================
   4. UI CONTROLS (HAMBURGER MENU & NAV BUTTONS)

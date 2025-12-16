@@ -12,8 +12,6 @@ const base = import.meta.env.BASE_URL;
 // ============================================================================
 
 const CONFIG = {
-
-
   // --- Camera & Navigation ---
   focusDistance: 35,          // How close the camera zooms to a face when clicked
   homeDistance: 255,          // Initial distance of the camera from center
