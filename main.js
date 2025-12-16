@@ -21,7 +21,7 @@ const CONFIG = {
   maxZoom: 10000,             // Furthest you can zoom out manually
   autoMoveSpeed: 0.08,        // Speed of the smooth camera transition (0.01 = slow, 0.1 = fast)
 
-  // --- Trackball Controls Settings (New) ---
+  // --- Trackball Controls Settings ---
   rotateSpeed: 4.0,           // How fast the object spins when dragging
   zoomSpeed: 1.2,             // How fast you zoom in/out
   panSpeed: 0.8,              // How fast you pan (right-click drag)
@@ -50,6 +50,14 @@ const CONFIG = {
 
   // --- Interaction ---
   doubleTapDelay: 300,        // Milliseconds to register a double-tap on mobile
+
+  // --- UI & Menu Settings ---
+  uiColor: '#00ffcc',         // Color of the text and borders
+  uiBgColor: 'rgba(0,0,0,0.8)', // Background color for buttons (if you want one)
+  uiHamburgerSize: '30px',    // Size of the ☰ icon
+  uiButtonFontSize: '20px',   // Font size for Left/Home/Right
+  uiButtonOpacity: 0.9,       // Opacity of the buttons
+  uiHoverScale: 1.1,          // How much buttons grow on hover
 };
 
 // ============================================================================
@@ -321,6 +329,7 @@ let startX = 0;
 let startY = 0;
 let lastPointerUpTime = 0; // For double-tap logic
 let isPointerDown = false; // for hover logic
+let currentFaceId = 0; // 0 = Home, 1-12 = Faces
 
 function updatePointerFromEvent(e) {
   // Support both mouse and touch events
@@ -333,29 +342,31 @@ function updatePointerFromEvent(e) {
 
 // --- Main Action: Click on Face ---
 function handleFaceClick(faceMesh) {
-  // 1. Temporarily restore full scale to get accurate target coordinates
-  const currentScale = modelRoot.scale.x; // Save current "star" scale
-  modelRoot.scale.setScalar(1);           // Force full size
-  modelRoot.updateMatrixWorld(true);      // Update positions
+    // track current face
+    currentFaceId = faceMesh.userData.id;
+    // 1. Temporarily restore full scale to get accurate target coordinates
+    const currentScale = modelRoot.scale.x; // Save current "star" scale
+    modelRoot.scale.setScalar(1);           // Force full size
+    modelRoot.updateMatrixWorld(true);      // Update positions
 
-  // 2. Calculate the target position based on the Full-Size model
-  const faceCenter = new THREE.Vector3();
-  faceMesh.getWorldPosition(faceCenter);
+    // 2. Calculate the target position based on the Full-Size model
+    const faceCenter = new THREE.Vector3();
+    faceMesh.getWorldPosition(faceCenter);
 
-  focusPoint.copy(faceCenter);
+    focusPoint.copy(faceCenter);
 
-  const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
-  
-  // Calculate where the camera SHOULD be (outside the full-sized face)
-  desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
+    const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
+    
+    // Calculate where the camera SHOULD be (outside the full-sized face)
+    desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
 
-  // 3. Revert the model to its "star" size so the visual transition remains smooth
-  modelRoot.scale.setScalar(currentScale);
-  modelRoot.updateMatrixWorld(true);
+    // 3. Revert the model to its "star" size so the visual transition remains smooth
+    modelRoot.scale.setScalar(currentScale);
+    modelRoot.updateMatrixWorld(true);
 
-  // 4. Trigger movement
-  isAutoMoving = true;
-  displayResumeContent(faceMesh.userData);
+    // 4. Trigger movement
+    isAutoMoving = true;
+    displayResumeContent(faceMesh.userData);
 }
 
 // --- UI: Resume Content ---
@@ -395,17 +406,19 @@ function displayResumeContent(data) {
 
 // --- Main Action: Reset View ---
 function resetEngram() {
-  const contentDiv = document.getElementById('resume-content');
-  if (contentDiv) contentDiv.style.display = 'none';
+    // --- Reset ID ---
+    currentFaceId = 0;
+    const contentDiv = document.getElementById('resume-content');
+    if (contentDiv) contentDiv.style.display = 'none';
 
-  focusPoint.copy(homeTarget);
-  desiredCameraPos.copy(homeCameraPos);
-  isAutoMoving = true;
+    focusPoint.copy(homeTarget);
+    desiredCameraPos.copy(homeCameraPos);
+    isAutoMoving = true;
 
-  if (INTERSECTED) {
-    INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
-    INTERSECTED = null;
-  }
+    if (INTERSECTED) {
+        INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
+        INTERSECTED = null;
+    }
 }
 
 // --- Star Interaction ---
@@ -523,6 +536,80 @@ window.addEventListener('resize', () => {
 });
 
 // ============================================================================
+// 🆕 UI & HAMBURGER LOGIC
+// ============================================================================
+
+function setupUI() {
+  const hamburger = document.getElementById('hamburger');
+  const navMenu = document.getElementById('nav-buttons');
+  const btns = navMenu.querySelectorAll('button');
+
+  // 1. Apply Config Styles dynamically
+  hamburger.style.color = CONFIG.uiColor;
+  hamburger.style.fontSize = CONFIG.uiHamburgerSize;
+  hamburger.style.opacity = CONFIG.uiButtonOpacity;
+
+  btns.forEach(btn => {
+    btn.style.color = CONFIG.uiColor;
+    btn.style.fontSize = CONFIG.uiButtonFontSize;
+    btn.style.opacity = CONFIG.uiButtonOpacity;
+    btn.style.backgroundColor = CONFIG.uiBgColor;
+    
+    // Hover Effects
+    btn.onmouseenter = () => { 
+        btn.style.transform = `scale(${CONFIG.uiHoverScale})`;
+        btn.style.background = CONFIG.uiColor;
+        btn.style.color = '#000'; // Invert text on hover
+    };
+    btn.onmouseleave = () => { 
+        btn.style.transform = 'scale(1)'; 
+        btn.style.background = CONFIG.uiBgColor;
+        btn.style.color = CONFIG.uiColor;
+    };
+  });
+
+  // 2. Hamburger Toggle
+  hamburger.addEventListener('click', () => {
+    const isOpen = navMenu.classList.contains('open');
+    if (isOpen) {
+        navMenu.classList.remove('open');
+        hamburger.innerHTML = "☰";
+    } else {
+        navMenu.classList.add('open');
+        hamburger.innerHTML = "✕"; // Change to X when open
+    }
+  });
+
+  // 3. Navigation Logic
+  document.getElementById('nav-left').addEventListener('click', () => {
+    if (currentFaceId <= 1) currentFaceId = 13; // Wrap around (12 + 1)
+    currentFaceId--;
+    navigateToFace(currentFaceId);
+  });
+
+  document.getElementById('nav-right').addEventListener('click', () => {
+    if (currentFaceId >= 12) currentFaceId = 0; // Wrap around
+    currentFaceId++;
+    navigateToFace(currentFaceId);
+  });
+
+  document.getElementById('nav-home').addEventListener('click', () => {
+    resetEngram();
+  });
+}
+
+// Helper to trigger click on a specific face ID
+function navigateToFace(id) {
+    const face = facesById[id];
+    if (face) {
+        handleFaceClick(face);
+    } else {
+        // Fallback to home if ID is invalid (like 0)
+        resetEngram();
+    }
+}
+
+// ============================================================================
 // 6. ANIMATION LOOP
 // ============================================================================
 
@@ -598,5 +685,5 @@ function animate() {
 
   renderer.render(scene, camera);
 }
-
+setupUI();
 animate();

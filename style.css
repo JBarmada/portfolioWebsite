@@ -132,3 +132,74 @@ canvas {
     visibility: hidden;
     pointer-events: none;
 }
+
+
+/*
+====================================================
+    4. UI CONTROLS (HAMBURGER MENU & NAV BUTTONS)
+====================================================
+*/
+
+/* UI Container - Top Left */
+#ui-container {
+    position: fixed;
+    top: 20px;
+    left: 20px;
+    z-index: 200; /* Above everything */
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 10px;
+}
+
+#hamburger {
+    background: none;
+    border: none;
+    cursor: pointer;
+    padding: 5px;
+    transition: transform 0.3s ease;
+}
+
+#nav-buttons {
+    display: flex;
+    flex-direction: column; /* Stacked on top of each other */
+    gap: 8px;
+    overflow: hidden;
+    max-height: 0; /* Hidden by default (slide effect) */
+    transition: max-height 0.4s ease-out, opacity 0.4s ease-out;
+    opacity: 0;
+}
+
+/* Class to reveal the menu */
+#nav-buttons.open {
+    max-height: 200px; /* Enough space for 3 buttons */
+    opacity: 1;
+}
+
+/* General button style (colors handled in JS Config) */
+#nav-buttons button {
+    background: none;
+    border: 1px solid currentColor;
+    border-radius: 4px;
+    padding: 8px 16px;
+    cursor: pointer;
+    font-family: 'Arial', sans-serif;
+    text-align: center;
+    transition: all 0.2s;
+}
+
+/* Ensure SVGs inside buttons act like text icons */
+#nav-buttons button svg {
+    /* "em" units allow them to scale based on the uiButtonFontSize in main.js */
+    width: 1.5em; 
+    height: 1.5em;
+    pointer-events: none; /* Let clicks pass through to the button */
+    display: block; /* Removes weird spacing below images */
+}
+
+#nav-buttons button {
+    display: flex; /* Centers the icon perfectly */
+    align-items: center;
+    justify-content: center;
+    padding: 8px; /* Slight adjustment for icon padding */
+}

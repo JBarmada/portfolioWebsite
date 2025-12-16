@@ -16,14 +16,35 @@
     <link rel="stylesheet" href="style.css">
 </head>
 <body>
-    <div id="loader-overlay">
-        <div class="loader-content">
-            <img src="./textures/loading.gif" alt="Loading..." class="loading-gif">
-            <p>Initializing Engram...</p>
-        </div>
+  <div id="loader-overlay">
+    <div class="loader-content">
+      <img src="./textures/loading.gif" alt="Loading..." class="loading-gif">
+      <p>Initializing Engram...</p>
     </div>
+  </div>
+  <div id="ui-container">
+    <button id="hamburger">☰</button>
+    <div id="nav-buttons">
+      <button id="nav-left" aria-label="Previous">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M15.41 7.41L14 6l-6 6 6 6 1.41-1.41L10.83 12z"/>
+        </svg>
+      </button>
 
-    <div id="resume-content"></div>
-    <script type="module" src="main.js"></script> 
+      <button id="nav-home" aria-label="Home">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M10 20v-6h4v6h5v-8h3L12 3 2 12h3v8z"/>
+        </svg>
+      </button>
+
+      <button id="nav-right" aria-label="Next">
+        <svg viewBox="0 0 24 24" width="24" height="24">
+          <path fill="currentColor" d="M10 6L8.59 7.41 13.17 12l-4.58 4.59L10 18l6-6z"/>
+        </svg>
+      </button>
+    </div>
+  </div>
+  <div id="resume-content"></div>
+  <script type="module" src="main.js"></script>
 </body>
 </html>
