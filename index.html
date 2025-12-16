@@ -12,9 +12,50 @@
     </script>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>My Dodecahedron Portfolio</title>
-  <script type="module" crossorigin src="/portfolioWebsite/assets/index-CjXBxvw1.js"></script>
-  <link rel="stylesheet" crossorigin href="/portfolioWebsite/assets/index-DO1n08Gq.css">
+    <title>My Dodecahedron Portfolio</title>
+    
+    <style>
+    /* Loader Overlay */
+    #loader-overlay {
+      position: fixed;
+      inset: 0;
+      background: #000000;
+      z-index: 9999;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      transition: opacity 0.8s ease-out, visibility 0.8s ease-out;
+    }
+
+    /* Loader Content */
+    .loader-content {
+      text-align: center;
+      color: #FFFFFF;
+      font-family: 'Arial', sans-serif;
+    }
+
+    /* Loader GIF */
+    .loading-gif {
+      width: 30vw; 
+      min-width: 250px; 
+      max-width: 600px;
+      height: auto;
+      margin-bottom: 20px;
+      /* Vignette Mask */
+      -webkit-mask-image: radial-gradient(circle, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+      mask-image: radial-gradient(circle, rgba(0,0,0,1) 50%, rgba(0,0,0,0) 100%);
+      object-fit: cover;
+    }
+
+    /* Fade Out State */
+    #loader-overlay.fade-out {
+      opacity: 0;
+      visibility: hidden;
+      pointer-events: none;
+    }
+  </style>
+  <script type="module" crossorigin src="/portfolioWebsite/assets/index-DXu0O9kI.js"></script>
+  <link rel="stylesheet" crossorigin href="/portfolioWebsite/assets/index-Bbs3v0T0.css">
 </head>
 <body>
   <div id="loader-overlay">
