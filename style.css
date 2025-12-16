@@ -133,22 +133,26 @@ canvas {
     pointer-events: none;
 }
 
-
 /*
 ====================================================
-    4. UI CONTROLS (HAMBURGER MENU & NAV BUTTONS)
+  4. UI CONTROLS (HAMBURGER MENU & NAV BUTTONS)
 ====================================================
 */
 
-/* UI Container - Top Left */
+/* UI Container - Bottom Right */
 #ui-container {
     position: fixed;
-    top: 20px;
-    left: 20px;
-    z-index: 200; /* Above everything */
+    bottom: 24px;  /* Anchored to bottom */
+    right: 20px;   /* Anchored to right */
+    z-index: 200; 
+    
     display: flex;
-    flex-direction: column;
-    align-items: flex-start;
+    /* This reverses the stacking order: 
+       The HTML order is Hamburger -> Menu.
+       Visual order becomes Menu (Top) -> Hamburger (Bottom). */
+    flex-direction: column-reverse; 
+    
+    align-items: flex-end; /* Aligns everything to the right edge */
     gap: 10px;
 }
 
@@ -162,21 +166,23 @@ canvas {
 
 #nav-buttons {
     display: flex;
-    flex-direction: column; /* Stacked on top of each other */
+    flex-direction: column; /* Keeps buttons ordered: Left(Top), Home, Right(Bottom) */
     gap: 8px;
     overflow: hidden;
-    max-height: 0; /* Hidden by default (slide effect) */
+    max-height: 0; 
     transition: max-height 0.4s ease-out, opacity 0.4s ease-out;
     opacity: 0;
 }
 
 /* Class to reveal the menu */
 #nav-buttons.open {
-    max-height: 200px; /* Enough space for 3 buttons */
+    max-height: 200px; 
     opacity: 1;
+    /* Note: Since the container is anchored to the 'bottom', 
+       increasing height naturally makes it grow upwards. */
 }
 
-/* General button style (colors handled in JS Config) */
+/* General button style */
 #nav-buttons button {
     background: none;
     border: 1px solid currentColor;
@@ -186,20 +192,17 @@ canvas {
     font-family: 'Arial', sans-serif;
     text-align: center;
     transition: all 0.2s;
-}
-
-/* Ensure SVGs inside buttons act like text icons */
-#nav-buttons button svg {
-    /* "em" units allow them to scale based on the uiButtonFontSize in main.js */
-    width: 1.5em; 
-    height: 1.5em;
-    pointer-events: none; /* Let clicks pass through to the button */
-    display: block; /* Removes weird spacing below images */
-}
-
-#nav-buttons button {
-    display: flex; /* Centers the icon perfectly */
+    
+    /* Center the icons */
+    display: flex; 
     align-items: center;
     justify-content: center;
-    padding: 8px; /* Slight adjustment for icon padding */
+}
+
+/* SVG Icon Sizing */
+#nav-buttons button svg {
+    width: 1.5em; 
+    height: 1.5em;
+    pointer-events: none; 
+    display: block; 
 }
