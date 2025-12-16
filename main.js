@@ -124,7 +124,7 @@ scene.add(rimLight);
 
 // HDRI Environment (Reflections)
 const rgbeLoader = new HDRLoader(loadingManager);
-rgbeLoader.load(`${base}textures/FreeGalaxies8k.hdr`, (texture) => {
+rgbeLoader.load(`${base}textures/reflection.hdr`, (texture) => {
   texture.mapping = THREE.EquirectangularReflectionMapping;
   scene.environment = texture;
   if(scene.environmentIntensity !== undefined) scene.environmentIntensity = 0.5; 

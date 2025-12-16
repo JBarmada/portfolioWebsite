@@ -20,7 +20,7 @@ export const CONFIG = {
     // ============================================
     // 🖱️ CONTROLS (TRACKBALL)
     // ============================================
-    rotateSpeed: 4.0,           // Speed of rotation
+    rotateSpeed: 2.0,           // Speed of rotation
     zoomSpeed: 1.2,             // Speed of zoom
     panSpeed: 0.8,              // Speed of panning
     dampingFactor: 0.1,         // Inertia/Slide effect (lower = slippier)

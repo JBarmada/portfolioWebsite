@@ -133,7 +133,13 @@ void main() {
   
   // Swirl and Rays
   float swirl = fbm(vec3(uv * 3.0, t * 0.18));
-  uv += normalize(uv) * (swirl - 0.5) * 0.08;
+  
+  // --- FIX: Prevent division by zero at the center ---
+  if (len > 0.001) {
+    uv += normalize(uv) * (swirl - 0.5) * 0.08;
+  }
+  // ---------------------------------------------------
+
   float rays = fbm(vec3(ang * 12.0, len * 5.0 - t * 0.30, t * 0.10));
   float glow = fbm(vec3(uv * 2.0, t * 0.14));
   
