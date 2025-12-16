@@ -109,12 +109,22 @@ renderer.domElement.addEventListener('wheel', () => { isAutoMoving = false; }, {
 // 5. LIGHTING & ENVIRONMENT
 // ============================================================================
 
+// --- ORBIT CONFIGURATION ---
+// We define the orbit center (Sun) and the radius.
+const ORBIT_CENTER = new THREE.Vector3(CONFIG.sunPosition.x, CONFIG.sunPosition.y, CONFIG.sunPosition.z);
+// If CONFIG.sunPosition is close, we might want a larger orbit radius for effect
+// For now, we calculate an initial offset based on where the Engram is relative to Sun.
+// Assuming Engram starts at 0,0,0 and Sun at CONFIG.sunPosition:
+let orbitRadius = ORBIT_CENTER.length(); 
+let currentOrbitAngle = Math.atan2(-ORBIT_CENTER.z, -ORBIT_CENTER.x); // Opposite of sun pos
+
 // Ambient Light (Base brightness)
 scene.add(new THREE.AmbientLight(0xffffff, CONFIG.ambientLightIntensity)); 
 
 // Sun Light (Directional light from the sun position)
+// The light source must move if the sun moves, but here the Sun is static and Engram orbits.
 const sunLight = new THREE.DirectionalLight(0xfff2cc, 5.0); 
-sunLight.position.set(CONFIG.sunPosition.x, CONFIG.sunPosition.y, CONFIG.sunPosition.z);
+sunLight.position.copy(ORBIT_CENTER);
 scene.add(sunLight);
 
 // Rim Light (Blue-ish backlighting)
@@ -132,6 +142,7 @@ rgbeLoader.load(`${base}textures/reflection.hdr`, (texture) => {
 
 // --- ☀️ INITIALIZE SUN (From sun.js) ---
 const sunData = createSun(CONFIG);
+sunData.group.position.copy(ORBIT_CENTER); // Place Sun Visual at the light source
 scene.add(sunData.group);
 
 // --- 🌌 SKY SPHERE ---
@@ -196,6 +207,13 @@ gltfLoader.load(`${base}engram1.glb`, (gltf) => {
   modelCenterAnchor = new THREE.Object3D();
   modelCenterAnchor.position.copy(center);
   modelRoot.add(modelCenterAnchor);
+
+  // Determine Orbit Radius based on loaded positions if needed
+  // For now we assume Engram starts at (0,0,0) and Sun is at config position.
+  // We offset the Engram slightly to start the orbit logic correctly if needed.
+  // Using the distance between 0,0,0 and Sun Pos as radius.
+  orbitRadius = ORBIT_CENTER.distanceTo(new THREE.Vector3(0,0,0));
+  if(orbitRadius < 100) orbitRadius = 500; // Enforce minimum orbit if too close
 
   // Process Mesh Faces
   let faceCount = 0;
@@ -271,14 +289,24 @@ function handleFaceClick(faceMesh) {
     // Calculate target position based on face normal
     const faceCenter = new THREE.Vector3();
     faceMesh.getWorldPosition(faceCenter);
-    const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
+    const faceNormal = new THREE.Vector3().copy(faceCenter).sub(modelRoot.position).normalize();
     
     moveEndTarget.copy(faceCenter);
     moveEndPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
     
-    // Calculate curved flight path
-    moveControlPos.addVectors(moveStartPos, moveEndPos).multiplyScalar(0.5);
-    moveControlPos.normalize().multiplyScalar(CONFIG.flightAltitude);
+    // --- FIX: Calculate Curve Relative to Model ---
+    // 1. Get the midpoint between start and end
+    const midPoint = new THREE.Vector3().addVectors(moveStartPos, moveEndPos).multiplyScalar(0.5);
+    
+    // 2. Calculate vector from Model Center to that Midpoint
+    const vecFromCenter = new THREE.Vector3().subVectors(midPoint, modelRoot.position);
+    
+    // 3. Push that vector out to the desired altitude (this creates the arc)
+    vecFromCenter.normalize().multiplyScalar(CONFIG.flightAltitude);
+    
+    // 4. Add the Model Position back to get the final World Space control point
+    moveControlPos.copy(modelRoot.position).add(vecFromCenter); 
+    // ----------------------------------------------
 
     // Restore scale
     modelRoot.scale.setScalar(currentScale);
@@ -324,10 +352,27 @@ function resetEngram() {
 
   moveStartPos.copy(camera.position);
   moveStartTarget.copy(controls.target);
-  moveEndPos.copy(homeCameraPos);
-  moveEndTarget.copy(homeTarget);
-  moveControlPos.copy(camera.position).add(homeCameraPos).multiplyScalar(0.5);
-  moveControlPos.normalize().multiplyScalar(CONFIG.homeDistance + 100);
+  
+  // Target is the current model position
+  moveEndTarget.copy(modelRoot.position); 
+  
+  // End Position: We want to be at a specific offset from the model, not world 0,0,0
+  // We'll effectively "teleport" the relative home offset to the model's current spot
+  const relativeHome = new THREE.Vector3(0, 0, CONFIG.homeDistance);
+  moveEndPos.copy(modelRoot.position).add(relativeHome);
+
+  // --- FIX: Curve Logic ---
+  const midPoint = new THREE.Vector3().addVectors(moveStartPos, moveEndPos).multiplyScalar(0.5);
+  const vecFromCenter = new THREE.Vector3().subVectors(midPoint, modelRoot.position);
+  
+  // If we are already at home, vecFromCenter might be zero, causing NaNs. Protect against that:
+  if (vecFromCenter.lengthSq() < 0.001) {
+      vecFromCenter.set(0, 1, 0); // Default to popping "up" if undefined
+  }
+  
+  vecFromCenter.normalize().multiplyScalar(CONFIG.flightAltitude); // Or slightly higher for home reset
+  moveControlPos.copy(modelRoot.position).add(vecFromCenter);
+  // -------------------------
 
   moveProgress = 0;
   isAutoMoving = true;
@@ -391,25 +436,17 @@ window.addEventListener('keydown', (e) => {
   }
 
   // 2. Map Keys to Face IDs
-  // 1-9 = Faces 1-9
-  // 0   = Face 10
-  // -   = Face 11
-  // =   = Face 12
   const keyMap = {
     '1': 1, '2': 2, '3': 3, '4': 4, '5': 5,
     '6': 6, '7': 7, '8': 8, '9': 9, '0': 10,
     '-': 11, '=': 12
   };
 
-  // 3. Trigger Navigation if a valid key was pressed
+  // 3. Trigger Navigation
   if (keyMap[e.key]) {
     const targetId = keyMap[e.key];
     const targetFace = facesById[targetId];
-    
-    // Only navigate if the model has finished loading (face exists)
-    if (targetFace) {
-      handleFaceClick(targetFace);
-    }
+    if (targetFace) handleFaceClick(targetFace);
   }
 });
 
@@ -475,10 +512,66 @@ function setupUI() {
 // 8. ANIMATION LOOP
 // ============================================================================
 
+// Orbit Variables
+const ORBIT_SPEED = 0.01; // Radians per second (adjust for speed)
+const SUN_ROTATION_SPEED = 0.01; 
+const CAMERA_AUTO_ROT_SPEED = 0.01; // Slow rotation around the engram
+
 function animate() {
   requestAnimationFrame(animate);
   const delta = clock.getDelta();
   const time = (performance.now() / 1000) * CONFIG.sunTimeScale;
+
+  // --- 0. Orbit Logic ---
+  // We calculate the orbit movement before other updates to keep everything synced
+  if (modelRoot) {
+    // 1. Update Angle
+    currentOrbitAngle += ORBIT_SPEED * delta;
+    
+    // 2. Calculate New Position for Engram
+    const oldEngramPos = modelRoot.position.clone();
+    
+    const newX = ORBIT_CENTER.x + Math.cos(currentOrbitAngle) * orbitRadius;
+    const newZ = ORBIT_CENTER.z + Math.sin(currentOrbitAngle) * orbitRadius;
+    
+    // 3. Apply New Position
+    modelRoot.position.set(newX, ORBIT_CENTER.y, newZ); // Keep Y level with sun for now, or use sphere math
+    
+    // 4. Calculate Delta (Change in position)
+    const moveDelta = new THREE.Vector3().subVectors(modelRoot.position, oldEngramPos);
+    
+    // 5. GEO-LOCK: Apply Delta to Camera and Controls
+    // This moves the camera WITH the model, preserving the relative view
+    camera.position.add(moveDelta);
+    controls.target.add(moveDelta);
+    
+    // Update Auto-move targets so flight paths don't break
+    if(isAutoMoving) {
+        moveStartPos.add(moveDelta);
+        moveEndPos.add(moveDelta);
+        moveControlPos.add(moveDelta);
+        moveStartTarget.add(moveDelta);
+        moveEndTarget.add(moveDelta);
+    }
+    
+    // 6. Camera Auto-Rotation (Rotate around Engram)
+    // Only if not dragging/interacting to avoid fighting the user
+    if (!isDragging && !isAutoMoving && !isPointerDown) {
+        const offset = new THREE.Vector3().subVectors(camera.position, controls.target);
+        // Rotate offset vector around Y axis
+        const rotSpeed = CAMERA_AUTO_ROT_SPEED * delta;
+        offset.applyAxisAngle(new THREE.Vector3(0, 1, 0), rotSpeed);
+        
+        camera.position.copy(controls.target).add(offset);
+        camera.lookAt(controls.target);
+    }
+  }
+
+  // Rotate Sun Mesh
+  if (sunData.group) {
+    sunData.group.rotation.y += SUN_ROTATION_SPEED * delta;
+  }
+
 
   // --- 1. Auto Movement Animation ---
   if (isAutoMoving) {

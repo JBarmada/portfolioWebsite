@@ -8,7 +8,7 @@ export const CONFIG = {
     // ============================================
     // 📷 CAMERA & NAVIGATION
     // ============================================
-    focusDistance: 35,          // Distance from the object when clicked/focused
+    focusDistance: 55,          // Distance from the object when clicked/focused
     homeDistance: 255,          // Initial distance of camera from center (Home position)
     camFov: 75,                 // Camera Field of View
     camFar: 100000,             // Render distance (how far the camera sees)
@@ -86,6 +86,6 @@ export const CONFIG = {
     
     // Technical geometry settings (Base sizes)
     sunCoreRadius: 2500,        // Radius of the inner sphere
-    sunCoronaWidth: 10000,      // Width of the glow plane
-    sunCoronaHeight: 11000,     // Height of the glow plane
+    sunCoronaWidth: 12000,      // Width of the glow plane
+    sunCoronaHeight: 12000,     // Height of the glow plane
   };
