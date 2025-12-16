@@ -37,77 +37,110 @@ canvas {
 }
 
 #resume-content {
-    /* Positioning */
-    position: absolute;
-    z-index: 100; 
-    top: 15vh; right: 10vw; 
-    width: min(400px, 80%);
-    padding: 25px;
+    /* 1. CENTERING STRATEGY */
+    position: fixed; /* Changed from absolute to fixed so it stays on screen */
+    z-index: 100;
+    
+    /* Exact center of the screen */
+    top: 50%;
+    left: 50%;
+    right: auto; /* clear previous positioning */
+    
+    /* Offset by -50% to center perfectly + Hardware Acceleration */
+    transform: translate(-50%, -50%) translateZ(0);
+
+    /* Sizing */
+    width: min(500px, 85%); /* Made slightly wider for better reading */
+    padding: 30px;
     
     display: none; 
     overflow: hidden; 
 
-    /* HOLOGRAM BASE + STATIC GRID TEXTURE */
-    background-color: var(--holo-bg);
-    background-image: repeating-linear-gradient(
-        to bottom,
-        transparent 0px,
-        transparent 2px,
-        rgba(0, 255, 255, 0.03) 2px, 
-        rgba(0, 255, 255, 0.03) 4px
-    );
+    /* 2. HOLOGRAM APPEARANCE */
+    background-color: rgba(0, 15, 30, 0.85); /* Darker, more solid background */
+    
+    /* The "Grid" Texture */
+    background-image: 
+        linear-gradient(rgba(109, 174, 181, 0.1) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(109, 174, 181, 0.1) 1px, transparent 1px);
+    background-size: 20px 20px;
 
     color: #aaddff;
     
-    border: 1px solid rgba(109, 174, 181, 0.4);
-    box-shadow: 0 0 15px rgba(109, 174, 181, 0.2);
-    border-radius: 6px;
+    /* 3. BORDERS & GLOW */
+    border: 1px solid rgba(109, 174, 181, 0.6);
+    border-radius: 4px;
+    
+    /* Multi-layered Glow */
+    box-shadow: 
+        0 0 10px rgba(109, 174, 181, 0.5),   /* Inner tight glow */
+        0 0 30px rgba(109, 174, 181, 0.3),   /* Medium spread */
+        0 0 60px rgba(109, 174, 181, 0.1),   /* Wide outer atmosphere */
+        inset 0 0 30px rgba(109, 174, 181, 0.1); /* Inner depth */
         
     /* Text Styles */
-    text-shadow: 0 0 5px rgba(109, 174, 181, 0.6);
+    text-shadow: 0 0 8px rgba(109, 174, 181, 0.8);
     font-family: "Consolas", "Monaco", "Courier New", monospace;
     text-transform: uppercase;
-    letter-spacing: 1px;
-    line-height: 1.5;
+    letter-spacing: 1.5px;
+    line-height: 1.6;
 
-    /* APPLY THE SVG FILTER HERE */
+    /* APPLY THE SVG FILTER */
     filter: url(#holo-glitch-filter);
 
-    /* Subtle opacity flicker (CSS) + Blur */
+    /* Subtle opacity flicker */
     animation: holo-flicker 4s infinite linear;
-    backdrop-filter: blur(2px);
-    
-    /* Ensure hardware acceleration for smoother filter */
-    transform: translateZ(0);
+    backdrop-filter: blur(6px);
 }
 
-/* THE SLOW, TRANSPARENT SCANLINE */
+/* 1. THE VERTICAL LIGHT BEAM (Behind the box) */
+#resume-content::before {
+    content: "";
+    position: absolute;
+    z-index: -1;
+    
+    /* Stretch far above and below the box */
+    top: -150%;
+    bottom: -150%;
+    left: 0;
+    right: 0;
+    
+    /* A vertical beam fading out at top and bottom */
+    background: linear-gradient(
+        to bottom,
+        transparent 0%,
+        rgba(109, 174, 181, 0) 20%,
+        rgba(109, 174, 181, 0.15) 50%, /* Brightest in center */
+        rgba(109, 174, 181, 0.8) 80%,
+        transparent 100%
+    );
+    
+    /* Blur it to look like light */
+    filter: blur(20px);
+    pointer-events: none;
+}
+
+/* 2. THE SCANLINE BAR (Moving down) */
 #resume-content::after {
     content: " ";
     display: block;
     position: absolute;
     left: 0; 
     right: 0;
-    
-    /* Height of the scan bar */
     height: 10%; 
-    
     z-index: 102; 
     pointer-events: none;
 
-    /* Very Transparent Gradient (Cyan/Teal) */
+    /* Bright cyan scanline */
     background: linear-gradient(
         to bottom, 
         transparent 0%, 
-        rgba(109, 174, 181, 0.15) 50%, /* 15% opacity = very subtle */
+        rgba(109, 174, 181, 0.14) 50%, 
         transparent 100%
     );
-    
-    /* Optional: Faint glow, also very transparent */
-    box-shadow: 0 0 10px rgba(109, 174, 181, 0.1);
+    box-shadow: 0 0 14px rgba(109, 174, 181, 0.14);
 
-    /* Animation: Slow (6s) and Periodic (Loops indefinitely) */
-    animation: scan-periodic 6s linear infinite;
+    animation: scan-periodic 4s linear infinite;
 }
 
 /* ====================================================
@@ -160,6 +193,7 @@ canvas {
     94% { opacity: 0.95; }
     100% { opacity: 0.95; }
 }
+
 /*
 ====================================================
   4. UI CONTROLS (HAMBURGER MENU & NAV BUTTONS)
@@ -168,68 +202,74 @@ canvas {
 
 /* UI Container - Bottom Right */
 #ui-container {
-    position: fixed;
-    bottom: 24px;  /* Anchored to bottom */
-    right: 20px;   /* Anchored to right */
-    z-index: 200; 
+    position: fixed !important;
+    bottom: 24px !important;
+    right: 20px !important;
+    z-index: 2000 !important; /* Super high z-index */
     
     display: flex;
-    /* This reverses the stacking order: 
-       The HTML order is Hamburger -> Menu.
-       Visual order becomes Menu (Top) -> Hamburger (Bottom). */
     flex-direction: column-reverse; 
-    
-    align-items: flex-end; /* Aligns everything to the right edge */
+    align-items: flex-end; /* Right align */
     gap: 10px;
 }
 
-#hamburger {
-    background: none;
-    border: none;
+/* SHARED STYLES: Force apply to both */
+#hamburger,
+#nav-buttons button {
+    /* VISIBILITY: Darker background + Blur */
+    background: rgba(0, 20, 50, 0.7) !important; 
+    backdrop-filter: blur(4px);
+    
+    /* BORDER: Cyan */
+    border: 1px solid var(--holo-color) !important;
+    color: var(--holo-color) !important;
+    border-radius: 4px;
+
+    /* SIZING: Fixed Square */
+    width: 42px !important;
+    height: 42px !important;
+    padding: 0 !important;
+    
+    /* LAYOUT: Center icon */
+    display: flex !important;
+    align-items: center !important;
+    justify-content: center !important;
+    
     cursor: pointer;
-    padding: 5px;
-    transition: transform 0.3s ease;
+    transition: all 0.2s ease;
+    box-shadow: 0 0 5px rgba(109, 174, 181, 0.3);
 }
 
+/* HOVER: Bright Cyan Glow */
+#hamburger:hover,
+#nav-buttons button:hover {
+    background: var(--holo-color) !important;
+    color: #000 !important;
+    box-shadow: 0 0 20px var(--holo-color) !important;
+    transform: scale(1.05);
+}
+
+/* NAV MENU CONTAINER */
 #nav-buttons {
     display: flex;
-    flex-direction: column; /* Keeps buttons ordered: Left(Top), Home, Right(Bottom) */
+    flex-direction: column; 
     gap: 8px;
+    
     overflow: hidden;
     max-height: 0; 
     transition: max-height 0.4s ease-out, opacity 0.4s ease-out;
     opacity: 0;
 }
 
-/* Class to reveal the menu */
 #nav-buttons.open {
     max-height: 200px; 
     opacity: 1;
-    /* Note: Since the container is anchored to the 'bottom', 
-       increasing height naturally makes it grow upwards. */
 }
 
-/* General button style */
-#nav-buttons button {
-    background: none;
-    border: 1px solid currentColor;
-    border-radius: 4px;
-    padding: 8px 16px;
-    cursor: pointer;
-    font-family: 'Arial', sans-serif;
-    text-align: center;
-    transition: all 0.2s;
-    
-    /* Center the icons */
-    display: flex; 
-    align-items: center;
-    justify-content: center;
-}
-
-/* SVG Icon Sizing */
+/* ICON SIZING */
 #nav-buttons button svg {
-    width: 1.5em; 
-    height: 1.5em;
+    width: 24px; 
+    height: 24px;
     pointer-events: none; 
     display: block; 
 }

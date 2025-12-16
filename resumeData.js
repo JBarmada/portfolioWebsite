@@ -4,7 +4,7 @@ export const RESUME_DATA = {
   1: {
     title: "Jad Barmada",
     content: `
-      <p><b>MS Computer Science Student</b><br>
+      <p><b>MS CS BS CECS Student</b><br>
       University of Southern California</p>
       <p>Passionate about Computer Engineering, Embedded Systems, and Full-Stack Development.</p>
       <p><i>Looking for Summer 2026 Opportunities</i></p>
