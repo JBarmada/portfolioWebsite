@@ -12,6 +12,8 @@ const base = import.meta.env.BASE_URL;
 // ============================================================================
 
 const CONFIG = {
+
+
   // --- Camera & Navigation ---
   focusDistance: 35,          // How close the camera zooms to a face when clicked
   homeDistance: 255,          // Initial distance of the camera from center
@@ -74,26 +76,34 @@ renderer.toneMapping = THREE.ACESFilmicToneMapping;
 renderer.toneMappingExposure = CONFIG.exposure;
 document.body.appendChild(renderer.domElement);
 
-
 // ============================================================================
 // LOADING MANAGER SETUP
 // ============================================================================
-
+// CONSTANT: Minimum time to show loader (in milliseconds)
+const MIN_LOAD_TIME = 1500; // 1.5 seconds (Adjust as needed)
 const loadingManager = THREE.DefaultLoadingManager;
-
 loadingManager.onLoad = function() {
     console.log('Loading complete!');
-    const loaderElement = document.getElementById('loader-overlay');
     
-    // Add the CSS class to fade it out
-    if(loaderElement) {
-        loaderElement.classList.add('fade-out');
+    // How long has the page been open?
+    const loadDuration = performance.now(); 
+    
+    // Calculate how much longer we need to wait to hit MIN_LOAD_TIME
+    const remainingDelay = Math.max(0, MIN_LOAD_TIME - loadDuration);
+
+    setTimeout(() => {
+        const loaderElement = document.getElementById('loader-overlay');
         
-        // Optional: Remove it from DOM entirely after transition ends
-        setTimeout(() => {
-            loaderElement.remove();
-        }, 1000); 
-    }
+        if(loaderElement) {
+            // Start the fade out
+            loaderElement.classList.add('fade-out');
+            
+            // Remove from DOM after the CSS transition (0.8s) is done
+            setTimeout(() => {
+                loaderElement.remove();
+            }, 1000); 
+        }
+    }, remainingDelay);
 };
 
 // Optional: specific progress logs
