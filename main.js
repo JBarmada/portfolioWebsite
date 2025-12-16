@@ -21,7 +21,8 @@ const CONFIG = {
   camFar: 20000,              // Draw distance (how far the camera sees)
   minZoom: 10,                // Closest you can zoom in manually
   maxZoom: 10000,             // Furthest you can zoom out manually
-  autoMoveSpeed: 0.08,        // Speed of the smooth camera transition (0.01 = slow, 0.1 = fast)
+  autoMoveSpeed: 0.03,        // Speed of the smooth camera transition (0.01 = slow, 0.1 = fast)
+  flightAltitude: 300, // How far to zoom out during the transition (Higher = bigger arc)
 
   // --- Trackball Controls Settings ---
   rotateSpeed: 4.0,           // How fast the object spins when dragging
@@ -67,6 +68,7 @@ const CONFIG = {
 // ============================================================================
 
 const scene = new THREE.Scene();
+const clock = new THREE.Clock();
 const camera = new THREE.PerspectiveCamera(CONFIG.camFov, window.innerWidth / window.innerHeight, 0.1, CONFIG.camFar);
 
 const renderer = new THREE.WebGLRenderer({ antialias: true });
@@ -173,6 +175,12 @@ controls.update();
 const focusPoint = new THREE.Vector3(0, 0, 0);
 const desiredCameraPos = new THREE.Vector3().copy(camera.position);
 let isAutoMoving = false;
+let moveProgress = 0; // Tracks 0.0 to 1.0
+const moveStartPos = new THREE.Vector3();
+const moveEndPos = new THREE.Vector3();
+const moveControlPos = new THREE.Vector3(); // The "peak" of the flight
+const moveStartTarget = new THREE.Vector3();
+const moveEndTarget = new THREE.Vector3();
 
 // Home Targets
 const homeTarget = new THREE.Vector3(0, 0, 0);
@@ -352,29 +360,35 @@ function updatePointerFromEvent(e) {
 
 // --- Main Action: Click on Face ---
 function handleFaceClick(faceMesh) {
-    // track current face
-    currentFaceId = faceMesh.userData.id;
     // 1. Temporarily restore full scale to get accurate target coordinates
-    const currentScale = modelRoot.scale.x; // Save current "star" scale
-    modelRoot.scale.setScalar(1);           // Force full size
-    modelRoot.updateMatrixWorld(true);      // Update positions
+    const currentScale = modelRoot.scale.x;
+    modelRoot.scale.setScalar(1);
+    modelRoot.updateMatrixWorld(true);
 
-    // 2. Calculate the target position based on the Full-Size model
+    // 2. Track where we are currently
+    currentFaceId = faceMesh.userData.id;
+    moveStartPos.copy(camera.position);
+    moveStartTarget.copy(controls.target);
+
+    // 3. Calculate destination (Face Focus)
     const faceCenter = new THREE.Vector3();
     faceMesh.getWorldPosition(faceCenter);
-
-    focusPoint.copy(faceCenter);
-
     const faceNormal = new THREE.Vector3().copy(faceCenter).normalize();
     
-    // Calculate where the camera SHOULD be (outside the full-sized face)
-    desiredCameraPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance));
+    moveEndTarget.copy(faceCenter); // Look at the face
+    moveEndPos.copy(faceCenter).add(faceNormal.multiplyScalar(CONFIG.focusDistance)); // Stop in front of it
 
-    // 3. Revert the model to its "star" size so the visual transition remains smooth
+    // 4. Calculate the "Arc" (Control Point)
+    // This point is halfway between start/end, but pushed OUTWARDS
+    moveControlPos.addVectors(moveStartPos, moveEndPos).multiplyScalar(0.5);
+    moveControlPos.normalize().multiplyScalar(CONFIG.flightAltitude);
+
+    // 5. Restore Model Scale
     modelRoot.scale.setScalar(currentScale);
     modelRoot.updateMatrixWorld(true);
 
-    // 4. Trigger movement
+    // 6. Start the Flight
+    moveProgress = 0;
     isAutoMoving = true;
     displayResumeContent(faceMesh.userData);
 }
@@ -414,21 +428,29 @@ function displayResumeContent(data) {
   };
 }
 
-// --- Main Action: Reset View ---
 function resetEngram() {
-    // --- Reset ID ---
-    currentFaceId = 0;
-    const contentDiv = document.getElementById('resume-content');
-    if (contentDiv) contentDiv.style.display = 'none';
+  currentFaceId = 0;
+  const contentDiv = document.getElementById('resume-content');
+  if (contentDiv) contentDiv.style.display = 'none';
 
-    focusPoint.copy(homeTarget);
-    desiredCameraPos.copy(homeCameraPos);
-    isAutoMoving = true;
+  if (INTERSECTED) {
+    INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
+    INTERSECTED = null;
+  }
 
-    if (INTERSECTED) {
-        INTERSECTED.material.emissive.setHex(INTERSECTED.userData.originalEmissive);
-        INTERSECTED = null;
-    }
+  // Setup Home Flight
+  moveStartPos.copy(camera.position);
+  moveStartTarget.copy(controls.target);
+  
+  moveEndPos.copy(homeCameraPos);
+  moveEndTarget.copy(homeTarget);
+
+  // For home, the arc is just slightly higher than home distance
+  moveControlPos.copy(camera.position).add(homeCameraPos).multiplyScalar(0.5);
+  moveControlPos.normalize().multiplyScalar(CONFIG.homeDistance + 100);
+
+  moveProgress = 0;
+  isAutoMoving = true;
 }
 
 // --- Star Interaction ---
@@ -625,17 +647,36 @@ function navigateToFace(id) {
 
 function animate() {
   requestAnimationFrame(animate);
-
+  // 1. Get the time passed since last frame (e.g., 0.016s for 60fps)
+  const delta = clock.getDelta();
   // Smooth Camera Movement
   if (isAutoMoving) {
-    // Note: Trackball target handling is slightly different, but this lerp still works
-    // effectively for the visual transition before we hand control back to the user.
-    controls.target.lerp(focusPoint, CONFIG.autoMoveSpeed);
-    camera.position.lerp(desiredCameraPos, CONFIG.autoMoveSpeed);
-
-    if (camera.position.distanceTo(desiredCameraPos) < 0.05) {
+    // 1. Increment progress
+    // moveProgress += CONFIG.autoMoveSpeed * 0.5; // (Adjust speed multiplier if needed)
+    const speedCorrection = 60; 
+    moveProgress += CONFIG.autoMoveSpeed * delta * speedCorrection;
+    if (moveProgress >= 1) {
+      moveProgress = 1;
       isAutoMoving = false;
     }
+
+    // 2. Calculate Smooth "Ease-In-Out" factor
+    // This makes it start slow, fly fast, then land slow
+    const t = moveProgress;
+    const smoothT = t * t * (3 - 2 * t); 
+
+    // 3. Move Camera along Quadratic Bezier Curve
+    // Formula: (1-t)^2 * P0 + 2(1-t)t * P1 + t^2 * P2
+    const p0 = moveStartPos;
+    const p1 = moveControlPos;
+    const p2 = moveEndPos;
+
+    camera.position.x = ((1 - smoothT) ** 2) * p0.x + 2 * (1 - smoothT) * smoothT * p1.x + (smoothT ** 2) * p2.x;
+    camera.position.y = ((1 - smoothT) ** 2) * p0.y + 2 * (1 - smoothT) * smoothT * p1.y + (smoothT ** 2) * p2.y;
+    camera.position.z = ((1 - smoothT) ** 2) * p0.z + 2 * (1 - smoothT) * smoothT * p1.z + (smoothT ** 2) * p2.z;
+
+    // 4. Move Target Linearly (Simple Lerp)
+    controls.target.lerpVectors(moveStartTarget, moveEndTarget, smoothT);
   }
 
   controls.update(); // Must be called every frame
