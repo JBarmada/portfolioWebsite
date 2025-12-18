@@ -94,7 +94,6 @@ export const RESUME_DATA = {
     title: "Contact",
     content: `
       <p><b>Email:</b> barmada@usc.edu<br>
-      <b>Phone:</b> (213) 569-5856</p>
       <p>
         <a href="https://linkedin.com/in/jadbarmada" target="_blank" style="color:#00ffcc">LinkedIn Profile</a><br>
         <a href="https://github.com/JBarmada" target="_blank" style="color:#00ffcc">GitHub Profile</a>
