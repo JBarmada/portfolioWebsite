@@ -4069,7 +4069,6 @@ void main() {
       </p>
     `},12:{title:"Locations",content:`
       <p><b>Current:</b> Los Angeles, CA<br>
-      <b>Hometown:</b> Jeddah, Saudi Arabia</p>
       <p>Open to relocation for internships.</p>
     `}},be={focusDistance:55,homeDistance:255,camFov:75,camFar:1e5,minZoom:10,maxZoom:1e4,autoMoveSpeed:.03,flightAltitude:300,rotateSpeed:2,zoomSpeed:1.2,panSpeed:.8,dampingFactor:.1,staticMoving:!1,doubleTapDelay:300,ambientLightIntensity:.2,exposure:1.15,bgDimOpacity:.17,fadeStart:2600,fadeEnd:3300,starSizeMultiplier:.1,starBaseSize:250,starPulseSpeed:.003,colorBase:8388736,colorEmissive:2228258,colorHighlight:16766720,materialOpacity:.5,materialRoughness:.1,materialMetalness:.6,uiColor:"#00ffcc",uiBgColor:"rgba(0,0,0,0.8)",uiHamburgerSize:"30px",uiButtonFontSize:"20px",uiButtonOpacity:.9,uiHoverScale:1.1,sunTimeScale:.25,sunCoreSpeed:1.25,sunCoronaSpeed:1,sunWarpStrength:2,sunWarpScale:2.2,sunTint:.7,sunIntensity:1,sunPosition:{x:15e3,y:2e4,z:1e4},sunGlobalScale:1,sunCoreRadius:2500,sunCoronaWidth:12e3,sunCoronaHeight:12e3},qu=`
 float hash(float n) { return fract(sin(n) * 43758.5453123); }
