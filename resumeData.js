@@ -104,7 +104,6 @@ export const RESUME_DATA = {
     title: "Locations",
     content: `
       <p><b>Current:</b> Los Angeles, CA<br>
-      <b>Hometown:</b> Jeddah, Saudi Arabia</p>
       <p>Open to relocation for internships.</p>
     `
   }
